@@ -48,3 +48,14 @@ php -S localhost:8000 -t public
 - Sessões seguras com `httponly`, `secure` e `samesite`
 - Remover/proteger `/install`
 - Rever limites de upload e MIME
+
+
+## Deploy em alojamento partilhado (403 Forbidden)
+Se o servidor abrir a raiz do projeto e mostrar **403 Forbidden**, use uma destas opções:
+
+1. **Recomendado:** apontar o DocumentRoot para a pasta `public/`.
+2. Se não for possível alterar o DocumentRoot, esta base já inclui:
+   - `index.php` na raiz (proxy para `public/index.php`)
+   - `.htaccess` na raiz e em `public/` para reescrita de rotas
+
+Também confirme permissões de leitura para o projeto e escrita em `storage/`.
