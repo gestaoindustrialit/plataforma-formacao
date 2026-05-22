@@ -1,0 +1,1 @@
+<?php foreach (['success','error'] as $type): if (!empty($_SESSION[$type])): ?><div class="alert alert-<?= $type==='error'?'danger':'success' ?>"><?= e($_SESSION[$type]); unset($_SESSION[$type]); ?></div><?php endif; endforeach; ?>
