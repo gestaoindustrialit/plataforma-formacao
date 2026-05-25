@@ -12,6 +12,13 @@ class DashboardController extends Controller
         $this->view('dashboard/index', ['title' => 'Centro de Formação']);
     }
 
+
+    public function profile(): void
+    {
+        Middleware::auth();
+        $this->view('profile/index', ['title' => 'Meu Perfil']);
+    }
+
     public function users(): void
     {
         Middleware::auth();
