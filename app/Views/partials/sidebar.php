@@ -1,1 +1,1 @@
-<div class="list-group"><a class="list-group-item" href="/admin">Dashboard</a></div>
+<div class="list-group"><a class="list-group-item" href="<?= e(url('/admin')) ?>">Dashboard</a></div>

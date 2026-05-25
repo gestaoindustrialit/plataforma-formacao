@@ -6,7 +6,7 @@ class Middleware
     public static function auth(): void
     {
         if (!Auth::check()) {
-            header('Location: /login');
+            header('Location: ' . url('/login'));
             exit;
         }
     }

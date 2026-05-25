@@ -6,4 +6,4 @@ $router->get('/login', [AuthController::class, 'loginForm']);
 $router->post('/login', [AuthController::class, 'login']);
 $router->get('/logout', [AuthController::class, 'logout']);
 $router->get('/dashboard', [DashboardController::class, 'index']);
-$router->get('/', function () { header('Location: /login'); });
+$router->get('/', function () { header('Location: ' . url('/login')); });
