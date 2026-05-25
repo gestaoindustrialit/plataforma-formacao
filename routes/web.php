@@ -7,6 +7,7 @@ $router->post('/login', [AuthController::class, 'login']);
 $router->get('/logout', [AuthController::class, 'logout']);
 
 $router->get('/dashboard', [DashboardController::class, 'index']);
+$router->get('/profile', [DashboardController::class, 'profile']);
 $router->get('/admin/users', [DashboardController::class, 'users']);
 $router->get('/admin/permissions', [DashboardController::class, 'permissions']);
 $router->get('/admin/contents', [DashboardController::class, 'contents']);
