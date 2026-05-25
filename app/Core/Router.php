@@ -5,32 +5,50 @@ use App\Core\Logger;
 
 class Router
 {
-    private array $routes = [];
+    private $routes = [];
 
-    public function get(string $path, callable|array $handler): void { $this->add('GET', $path, $handler); }
-    public function post(string $path, callable|array $handler): void { $this->add('POST', $path, $handler); }
+    public function get(string $path, $handler): void { $this->add('GET', $path, $handler); }
+    public function post(string $path, $handler): void { $this->add('POST', $path, $handler); }
 
-    private function add(string $method, string $path, callable|array $handler): void
+    private function add(string $method, string $path, $handler): void
     {
-        $this->routes[] = compact('method', 'path', 'handler');
+        $this->routes[] = [
+            'method' => $method,
+            'path' => $this->normalizePath($path),
+            'handler' => $handler,
+        ];
+    }
+
+    private function normalizePath(string $path): string
+    {
+        $path = '/' . ltrim($path, '/');
+        return $path === '/' ? '/' : rtrim($path, '/');
     }
 
     public function dispatch(string $method, string $uri): void
     {
-        $uri = rtrim($uri, '/') ?: '/';
+        $uri = $this->normalizePath($uri);
+
         foreach ($this->routes as $route) {
-            if ($route['method'] !== $method) continue;
+            if ($route['method'] !== $method) {
+                continue;
+            }
+
             $pattern = preg_replace('#\{[^/]+\}#', '([^/]+)', $route['path']);
-            $pattern = '#^' . rtrim($pattern, '/') . '$#';
+            $pattern = '#^' . str_replace('/', '\/', $pattern) . '$#';
+
             if (preg_match($pattern, $uri, $matches)) {
                 array_shift($matches);
                 $handler = $route['handler'];
+
                 if (is_array($handler)) {
-                    [$controller, $action] = $handler;
-                    (new $controller())->$action(...$matches);
+                    $controller = $handler[0];
+                    $action = $handler[1];
+                    call_user_func_array([new $controller(), $action], $matches);
                     return;
                 }
-                $handler(...$matches);
+
+                call_user_func_array($handler, $matches);
                 return;
             }
         }

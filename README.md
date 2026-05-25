@@ -72,6 +72,8 @@ O log regista:
 - Rotas não encontradas (404)
 - Erros/exceções PHP
 
+- Corrigido bug de roteamento da rota raiz (`/`) que podia gerar 404 mesmo com rota definida.
+
 Confirme também:
 - `storage/` com escrita
 - `mod_rewrite` ativo (Apache)
