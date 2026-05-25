@@ -1,6 +1,8 @@
 <?php
 namespace App\Core;
 
+use App\Core\Logger;
+
 class Router
 {
     private array $routes = [];
@@ -33,6 +35,7 @@ class Router
             }
         }
 
+        Logger::write('warning', 'route_not_found', ['method' => $method, 'uri' => $uri]);
         http_response_code(404);
         include __DIR__ . '/../Views/errors/404.php';
     }

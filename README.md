@@ -59,3 +59,20 @@ Se o servidor abrir a raiz do projeto e mostrar **403 Forbidden**, use uma desta
    - `.htaccess` na raiz e em `public/` para reescrita de rotas
 
 Também confirme permissões de leitura para o projeto e escrita em `storage/`.
+
+
+## Diagnóstico de 404 após instalação
+Se a app ficar em subpasta (ex.: `/formacao`) e devolver 404, esta versão já remove automaticamente o base path no `public/index.php` antes do dispatch de rotas.
+
+Também foi adicionado log em:
+- `storage/logs/app.log`
+
+O log regista:
+- URI recebida e rota despachada
+- Rotas não encontradas (404)
+- Erros/exceções PHP
+
+Confirme também:
+- `storage/` com escrita
+- `mod_rewrite` ativo (Apache)
+- `.htaccess` permitido (`AllowOverride All`)
