@@ -283,21 +283,15 @@ class DashboardController extends Controller
     {
         $departments = [];
         $userNames = [];
-        $roleOptions = [];
 
         foreach ($users as $user) {
             $department = trim((string)($user['department'] ?? ''));
             $name = trim((string)($user['name'] ?? ''));
-            $role = trim((string)($user['role'] ?? ''));
-
             if ($department !== '') {
                 $departments[] = $department;
             }
             if ($name !== '') {
                 $userNames[] = $name;
-            }
-            if ($role !== '') {
-                $roleOptions[] = $role;
             }
         }
 
@@ -323,20 +317,17 @@ class DashboardController extends Controller
 
         $departments = array_values(array_unique($departments));
         $userNames = array_values(array_unique($userNames));
-        $roleOptions = array_values(array_unique($roleOptions));
         $extraVisibleOptions = array_values(array_unique($extraVisibleOptions));
         $extraEditableOptions = array_values(array_unique($extraEditableOptions));
 
         sort($departments);
         sort($userNames);
-        sort($roleOptions);
         sort($extraVisibleOptions);
         sort($extraEditableOptions);
 
         return [
             'departments' => $departments,
             'userNames' => $userNames,
-            'roleOptions' => $roleOptions,
             'extraVisibleOptions' => $extraVisibleOptions,
             'extraEditableOptions' => $extraEditableOptions,
         ];
@@ -441,11 +432,9 @@ class DashboardController extends Controller
             'departments' => $options['departments'],
             'visibleDepartmentOptions' => $options['departments'],
             'visibleUserOptions' => $options['userNames'],
-            'visibleRoleOptions' => $options['roleOptions'],
             'visibleExtraOptions' => $options['extraVisibleOptions'],
             'editableDepartmentOptions' => $options['departments'],
             'editableUserOptions' => $options['userNames'],
-            'editableRoleOptions' => $options['roleOptions'],
             'editableExtraOptions' => $options['extraEditableOptions'],
         ]);
     }
