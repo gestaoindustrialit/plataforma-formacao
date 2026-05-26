@@ -73,7 +73,7 @@
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="col-md-5"><input type="file" name="video_file" class="form-control" accept="video/mp4,video/webm,video/quicktime,.m4v"></div>
+        <div class="col-md-5"><input type="file" name="content_file" class="form-control" accept="video/mp4,video/webm,video/quicktime,.m4v,application/pdf,.pdf"></div>
         <div class="col-md-4"><input name="video_url" class="form-control" placeholder="URL vídeo (opcional como alternativa ao upload)"></div>
         <div class="col-md-3"><button class="btn btn-dark w-100" type="submit">+ Adicionar Conteúdo</button></div>
     </form>
@@ -91,7 +91,7 @@
                     <td>
                         <form method="post" action="<?= e(url('/admin/contents/delete')) ?>">
                             <input type="hidden" name="id" value="<?= (int)$content['id'] ?>">
-                            <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
+                            <a class="btn btn-sm btn-outline-secondary me-1" href="<?= e(url('/admin/contents/edit?id=' . (int)$content['id'])) ?>">Editar</a><button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
                         </form>
                     </td>
                 </tr>

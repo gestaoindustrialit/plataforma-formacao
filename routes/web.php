@@ -18,7 +18,11 @@ $router->get('/admin/permissions', [DashboardController::class, 'permissions']);
 $router->post('/admin/permissions/save', [DashboardController::class, 'savePermissions']);
 $router->get('/admin/contents', [DashboardController::class, 'contents']);
 $router->post('/admin/contents/store', [DashboardController::class, 'storeContent']);
+$router->get('/admin/contents/edit', [DashboardController::class, 'editContent']);
+$router->post('/admin/contents/update', [DashboardController::class, 'updateContent']);
 $router->post('/admin/contents/delete', [DashboardController::class, 'deleteContent']);
+$router->get('/contents', [DashboardController::class, 'listContents']);
+$router->get('/contents/show', [DashboardController::class, 'showContent']);
 $router->get('/admin/knowledge', [DashboardController::class, 'knowledge']);
 $router->post('/admin/knowledge/store', [DashboardController::class, 'storeKnowledgeNode']);
 
