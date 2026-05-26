@@ -379,13 +379,22 @@ class DashboardController extends Controller
         }
 
         if (!is_dir($uploadDir)) {
-            @mkdir($uploadDir, 0775, true);
+            $parentDir = dirname($uploadDir);
+            if (!is_dir($parentDir) || !is_writable($parentDir) || !mkdir($uploadDir, 0775, true)) {
+                $_SESSION['error'] = 'A pasta de upload não está disponível para escrita. Verifique permissões (chmod/chown).';
+                return '';
+            }
+        }
+
+        if (!is_writable($uploadDir)) {
+            $_SESSION['error'] = 'A pasta de upload não tem permissões de escrita. Verifique chmod/chown.';
+            return '';
         }
 
         $fileName = uniqid($prefix, true) . '.' . $extension;
         $destination = $uploadDir . '/' . $fileName;
-        if (!@move_uploaded_file($tmpName, $destination)) {
-            $_SESSION['error'] = 'Não foi possível guardar o ficheiro no servidor.';
+        if (!move_uploaded_file($tmpName, $destination)) {
+            $_SESSION['error'] = 'Não foi possível guardar o ficheiro no servidor. Verifique permissões da pasta de upload.';
             return '';
         }
 
