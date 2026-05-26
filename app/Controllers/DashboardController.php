@@ -6,6 +6,16 @@ use App\Core\Middleware;
 
 class DashboardController extends Controller
 {
+    private function defaultProfiles(): array
+    {
+        return ['Formador', 'Operador', 'Gestor', 'Admin'];
+    }
+
+    private function defaultScopes(): array
+    {
+        return ['Produção', 'Qualidade', 'RH', 'Global'];
+    }
+
     private function defaultPermissions(): array
     {
         return ['user' => 'Ana Martins', 'profile' => 'Formador', 'scope' => 'Produção', 'can_view' => true, 'can_edit' => true, 'can_approve' => false];
@@ -154,19 +164,106 @@ class DashboardController extends Controller
     public function permissions(): void
     {
         Middleware::auth();
+        $users = $this->getUsers();
+
+        if (!isset($_SESSION['permission_profiles'])) {
+            $_SESSION['permission_profiles'] = $this->defaultProfiles();
+        }
+
+        if (!isset($_SESSION['permission_scopes'])) {
+            $_SESSION['permission_scopes'] = $this->defaultScopes();
+        }
+
         if (!isset($_SESSION['permissions_form'])) {
             $_SESSION['permissions_form'] = $this->defaultPermissions();
         }
-        $this->view('admin/permissions/index', ['title' => 'Permissões por Utilizador', 'permissions' => $_SESSION['permissions_form']]);
+
+        if (!empty($users)) {
+            $selectedUser = $_SESSION['permissions_form']['user'] ?? '';
+            $matched = null;
+
+            foreach ($users as $user) {
+                if (($user['name'] ?? '') === $selectedUser) {
+                    $matched = $user;
+                    break;
+                }
+            }
+
+            if (!$matched) {
+                $matched = $users[0];
+                $_SESSION['permissions_form']['user'] = $matched['name'];
+            }
+
+            if (empty($_SESSION['permissions_form']['profile']) && !empty($matched['role'])) {
+                $_SESSION['permissions_form']['profile'] = $matched['role'];
+            }
+
+            if (empty($_SESSION['permissions_form']['scope']) && !empty($matched['department'])) {
+                $_SESSION['permissions_form']['scope'] = $matched['department'];
+            }
+
+            if (!in_array($_SESSION['permissions_form']['profile'], $_SESSION['permission_profiles'], true)) {
+                $_SESSION['permission_profiles'][] = $_SESSION['permissions_form']['profile'];
+            }
+
+            if (!in_array($_SESSION['permissions_form']['scope'], $_SESSION['permission_scopes'], true)) {
+                $_SESSION['permission_scopes'][] = $_SESSION['permissions_form']['scope'];
+            }
+        }
+
+        $this->view('admin/permissions/index', [
+            'title' => 'Permissões por Utilizador',
+            'permissions' => $_SESSION['permissions_form'],
+            'users' => $users,
+            'profiles' => $_SESSION['permission_profiles'],
+            'scopes' => $_SESSION['permission_scopes'],
+        ]);
     }
 
     public function savePermissions(): void
     {
         Middleware::auth();
+        $users = $this->getUsers();
+        $selectedUser = trim($_POST['user'] ?? '');
+        $selectedProfile = trim($_POST['profile'] ?? '');
+        $selectedScope = trim($_POST['scope'] ?? '');
+
+        foreach ($users as $user) {
+            if (($user['name'] ?? '') !== $selectedUser) {
+                continue;
+            }
+
+            if ($selectedProfile === '' && !empty($user['role'])) {
+                $selectedProfile = $user['role'];
+            }
+
+            if ($selectedScope === '' && !empty($user['department'])) {
+                $selectedScope = $user['department'];
+            }
+
+            break;
+        }
+
+        if (!isset($_SESSION['permission_profiles'])) {
+            $_SESSION['permission_profiles'] = $this->defaultProfiles();
+        }
+
+        if (!isset($_SESSION['permission_scopes'])) {
+            $_SESSION['permission_scopes'] = $this->defaultScopes();
+        }
+
+        if ($selectedProfile !== '' && !in_array($selectedProfile, $_SESSION['permission_profiles'], true)) {
+            $_SESSION['permission_profiles'][] = $selectedProfile;
+        }
+
+        if ($selectedScope !== '' && !in_array($selectedScope, $_SESSION['permission_scopes'], true)) {
+            $_SESSION['permission_scopes'][] = $selectedScope;
+        }
+
         $_SESSION['permissions_form'] = [
-            'user' => trim($_POST['user'] ?? ''),
-            'profile' => trim($_POST['profile'] ?? ''),
-            'scope' => trim($_POST['scope'] ?? ''),
+            'user' => $selectedUser,
+            'profile' => $selectedProfile,
+            'scope' => $selectedScope,
             'can_view' => isset($_POST['can_view']),
             'can_edit' => isset($_POST['can_edit']),
             'can_approve' => isset($_POST['can_approve']),
