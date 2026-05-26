@@ -18,7 +18,21 @@
         <div class="col-md-2">
             <select name="visible_for" class="form-select" required>
                 <option value="">Visível para</option>
-                <?php foreach (($visibleOptions ?? []) as $option): ?>
+                <?php if (!empty($visibleDepartmentOptions ?? [])): ?>
+                    <optgroup label="Departamentos">
+                        <?php foreach ($visibleDepartmentOptions as $option): ?>
+                            <option value="<?= e($option) ?>"><?= e($option) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endif; ?>
+                <?php if (!empty($visibleUserOptions ?? [])): ?>
+                    <optgroup label="Utilizadores">
+                        <?php foreach ($visibleUserOptions as $option): ?>
+                            <option value="<?= e($option) ?>"><?= e($option) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endif; ?>
+                <?php foreach (($visibleExtraOptions ?? []) as $option): ?>
                     <option value="<?= e($option) ?>"><?= e($option) ?></option>
                 <?php endforeach; ?>
             </select>
@@ -26,7 +40,21 @@
         <div class="col-md-3">
             <select name="editable_by" class="form-select" required>
                 <option value="">Editável por</option>
-                <?php foreach (($editableOptions ?? []) as $option): ?>
+                <?php if (!empty($editableDepartmentOptions ?? [])): ?>
+                    <optgroup label="Departamentos">
+                        <?php foreach ($editableDepartmentOptions as $option): ?>
+                            <option value="<?= e($option) ?>"><?= e($option) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endif; ?>
+                <?php if (!empty($editableUserOptions ?? [])): ?>
+                    <optgroup label="Utilizadores">
+                        <?php foreach ($editableUserOptions as $option): ?>
+                            <option value="<?= e($option) ?>"><?= e($option) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endif; ?>
+                <?php foreach (($editableExtraOptions ?? []) as $option): ?>
                     <option value="<?= e($option) ?>"><?= e($option) ?></option>
                 <?php endforeach; ?>
             </select>
@@ -35,7 +63,7 @@
         <div class="col-md-4"><input name="video_url" class="form-control" placeholder="URL vídeo (opcional como alternativa ao upload)"></div>
         <div class="col-md-3"><button class="btn btn-dark w-100" type="submit">+ Adicionar Conteúdo</button></div>
     </form>
-    <div class="alert alert-secondary">Defina permissões por conteúdo: <strong>quem pode ver</strong> e <strong>quem pode editar</strong> (por utilizador, papel ou departamento).</div>
+    <div class="alert alert-secondary">Defina permissões por conteúdo: <strong>quem pode ver</strong> e <strong>quem pode editar</strong> (por utilizador ou departamento).</div>
     <table class="table">
         <thead><tr><th>Conteúdo</th><th>Descrição</th><th>Tipo</th><th>Visível para</th><th>Editável por</th><th></th></tr></thead>
         <tbody>
