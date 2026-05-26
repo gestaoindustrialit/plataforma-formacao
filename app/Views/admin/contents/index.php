@@ -18,7 +18,28 @@
         <div class="col-md-2">
             <select name="visible_for" class="form-select" required>
                 <option value="">Visível para</option>
-                <?php foreach (($visibleOptions ?? []) as $option): ?>
+                <?php if (!empty($visibleDepartmentOptions ?? [])): ?>
+                    <optgroup label="Departamentos">
+                        <?php foreach ($visibleDepartmentOptions as $option): ?>
+                            <option value="<?= e($option) ?>"><?= e($option) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endif; ?>
+                <?php if (!empty($visibleUserOptions ?? [])): ?>
+                    <optgroup label="Utilizadores">
+                        <?php foreach ($visibleUserOptions as $option): ?>
+                            <option value="<?= e($option) ?>"><?= e($option) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endif; ?>
+                <?php if (!empty($visibleRoleOptions ?? [])): ?>
+                    <optgroup label="Papéis">
+                        <?php foreach ($visibleRoleOptions as $option): ?>
+                            <option value="<?= e($option) ?>"><?= e($option) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endif; ?>
+                <?php foreach (($visibleExtraOptions ?? []) as $option): ?>
                     <option value="<?= e($option) ?>"><?= e($option) ?></option>
                 <?php endforeach; ?>
             </select>
@@ -26,7 +47,28 @@
         <div class="col-md-3">
             <select name="editable_by" class="form-select" required>
                 <option value="">Editável por</option>
-                <?php foreach (($editableOptions ?? []) as $option): ?>
+                <?php if (!empty($editableDepartmentOptions ?? [])): ?>
+                    <optgroup label="Departamentos">
+                        <?php foreach ($editableDepartmentOptions as $option): ?>
+                            <option value="<?= e($option) ?>"><?= e($option) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endif; ?>
+                <?php if (!empty($editableUserOptions ?? [])): ?>
+                    <optgroup label="Utilizadores">
+                        <?php foreach ($editableUserOptions as $option): ?>
+                            <option value="<?= e($option) ?>"><?= e($option) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endif; ?>
+                <?php if (!empty($editableRoleOptions ?? [])): ?>
+                    <optgroup label="Papéis">
+                        <?php foreach ($editableRoleOptions as $option): ?>
+                            <option value="<?= e($option) ?>"><?= e($option) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endif; ?>
+                <?php foreach (($editableExtraOptions ?? []) as $option): ?>
                     <option value="<?= e($option) ?>"><?= e($option) ?></option>
                 <?php endforeach; ?>
             </select>

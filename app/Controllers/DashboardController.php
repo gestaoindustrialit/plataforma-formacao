@@ -276,12 +276,25 @@ class DashboardController extends Controller
     private function collectContentOptions(array $contents, array $users): array
     {
         $departments = [];
+        $userNames = [];
+        $roleOptions = [];
+
         foreach ($users as $user) {
             $department = trim((string)($user['department'] ?? ''));
+            $name = trim((string)($user['name'] ?? ''));
+            $role = trim((string)($user['role'] ?? ''));
+
             if ($department !== '') {
                 $departments[] = $department;
             }
+            if ($name !== '') {
+                $userNames[] = $name;
+            }
+            if ($role !== '') {
+                $roleOptions[] = $role;
+            }
         }
+
         foreach ($contents as $content) {
             $department = trim((string)($content['department'] ?? ''));
             if ($department !== '') {
@@ -289,42 +302,37 @@ class DashboardController extends Controller
             }
         }
 
-        $visibleOptions = [];
-        $editableOptions = [];
-        foreach ($users as $user) {
-            $name = trim((string)($user['name'] ?? ''));
-            $role = trim((string)($user['role'] ?? ''));
-            if ($name !== '') {
-                $visibleOptions[] = $name;
-                $editableOptions[] = $name;
-            }
-            if ($role !== '') {
-                $visibleOptions[] = $role;
-                $editableOptions[] = $role;
-            }
-        }
+        $extraVisibleOptions = [];
+        $extraEditableOptions = [];
         foreach ($contents as $content) {
             $visible = trim((string)($content['visible_for'] ?? ''));
             $editable = trim((string)($content['editable_by'] ?? ''));
             if ($visible !== '') {
-                $visibleOptions[] = $visible;
+                $extraVisibleOptions[] = $visible;
             }
             if ($editable !== '') {
-                $editableOptions[] = $editable;
+                $extraEditableOptions[] = $editable;
             }
         }
 
         $departments = array_values(array_unique($departments));
-        $visibleOptions = array_values(array_unique($visibleOptions));
-        $editableOptions = array_values(array_unique($editableOptions));
+        $userNames = array_values(array_unique($userNames));
+        $roleOptions = array_values(array_unique($roleOptions));
+        $extraVisibleOptions = array_values(array_unique($extraVisibleOptions));
+        $extraEditableOptions = array_values(array_unique($extraEditableOptions));
+
         sort($departments);
-        sort($visibleOptions);
-        sort($editableOptions);
+        sort($userNames);
+        sort($roleOptions);
+        sort($extraVisibleOptions);
+        sort($extraEditableOptions);
 
         return [
             'departments' => $departments,
-            'visibleOptions' => $visibleOptions,
-            'editableOptions' => $editableOptions,
+            'userNames' => $userNames,
+            'roleOptions' => $roleOptions,
+            'extraVisibleOptions' => $extraVisibleOptions,
+            'extraEditableOptions' => $extraEditableOptions,
         ];
     }
 
@@ -385,8 +393,14 @@ class DashboardController extends Controller
             'title' => 'Conteúdos de Formação',
             'contents' => $_SESSION['contents'],
             'departments' => $options['departments'],
-            'visibleOptions' => $options['visibleOptions'],
-            'editableOptions' => $options['editableOptions'],
+            'visibleDepartmentOptions' => $options['departments'],
+            'visibleUserOptions' => $options['userNames'],
+            'visibleRoleOptions' => $options['roleOptions'],
+            'visibleExtraOptions' => $options['extraVisibleOptions'],
+            'editableDepartmentOptions' => $options['departments'],
+            'editableUserOptions' => $options['userNames'],
+            'editableRoleOptions' => $options['roleOptions'],
+            'editableExtraOptions' => $options['extraEditableOptions'],
         ]);
     }
 
