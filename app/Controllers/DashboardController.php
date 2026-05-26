@@ -175,13 +175,122 @@ class DashboardController extends Controller
         $this->redirect('/admin/permissions');
     }
 
+
+    private function collectContentOptions(array $contents, array $users): array
+    {
+        $departments = [];
+        foreach ($users as $user) {
+            $department = trim((string)($user['department'] ?? ''));
+            if ($department !== '') {
+                $departments[] = $department;
+            }
+        }
+        foreach ($contents as $content) {
+            $department = trim((string)($content['department'] ?? ''));
+            if ($department !== '') {
+                $departments[] = $department;
+            }
+        }
+
+        $visibleOptions = [];
+        $editableOptions = [];
+        foreach ($users as $user) {
+            $name = trim((string)($user['name'] ?? ''));
+            $role = trim((string)($user['role'] ?? ''));
+            if ($name !== '') {
+                $visibleOptions[] = $name;
+                $editableOptions[] = $name;
+            }
+            if ($role !== '') {
+                $visibleOptions[] = $role;
+                $editableOptions[] = $role;
+            }
+        }
+        foreach ($contents as $content) {
+            $visible = trim((string)($content['visible_for'] ?? ''));
+            $editable = trim((string)($content['editable_by'] ?? ''));
+            if ($visible !== '') {
+                $visibleOptions[] = $visible;
+            }
+            if ($editable !== '') {
+                $editableOptions[] = $editable;
+            }
+        }
+
+        $departments = array_values(array_unique($departments));
+        $visibleOptions = array_values(array_unique($visibleOptions));
+        $editableOptions = array_values(array_unique($editableOptions));
+        sort($departments);
+        sort($visibleOptions);
+        sort($editableOptions);
+
+        return [
+            'departments' => $departments,
+            'visibleOptions' => $visibleOptions,
+            'editableOptions' => $editableOptions,
+        ];
+    }
+
+    private function handleVideoUpload(): string
+    {
+        if (!isset($_FILES['video_file']) || !is_array($_FILES['video_file'])) {
+            return '';
+        }
+
+        $file = $_FILES['video_file'];
+        $error = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($error === UPLOAD_ERR_NO_FILE) {
+            return '';
+        }
+
+        if ($error !== UPLOAD_ERR_OK) {
+            $_SESSION['error'] = 'Falha no upload do vídeo. Tente novamente.';
+            return '';
+        }
+
+        $tmpName = (string)($file['tmp_name'] ?? '');
+        if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+            $_SESSION['error'] = 'Ficheiro de vídeo inválido.';
+            return '';
+        }
+
+        $extension = strtolower((string)pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
+        $allowed = ['mp4', 'webm', 'mov', 'm4v'];
+        if (!in_array($extension, $allowed, true)) {
+            $_SESSION['error'] = 'Formato de vídeo não suportado. Use MP4, WEBM, MOV ou M4V.';
+            return '';
+        }
+
+        $uploadDir = APP_ROOT . '/public/uploads/videos';
+        if (!is_dir($uploadDir)) {
+            @mkdir($uploadDir, 0775, true);
+        }
+
+        $fileName = uniqid('video_', true) . '.' . $extension;
+        $destination = $uploadDir . '/' . $fileName;
+        if (!@move_uploaded_file($tmpName, $destination)) {
+            $_SESSION['error'] = 'Não foi possível guardar o vídeo no servidor.';
+            return '';
+        }
+
+        return url('/uploads/videos/' . $fileName);
+    }
     public function contents(): void
     {
         Middleware::auth();
         if (!isset($_SESSION['contents'])) {
             $_SESSION['contents'] = $this->defaultContents();
         }
-        $this->view('admin/contents/index', ['title' => 'Conteúdos de Formação', 'contents' => $_SESSION['contents']]);
+        $users = $_SESSION['users'] ?? $this->defaultUsers();
+        $options = $this->collectContentOptions($_SESSION['contents'], $users);
+
+        $this->view('admin/contents/index', [
+            'title' => 'Conteúdos de Formação',
+            'contents' => $_SESSION['contents'],
+            'departments' => $options['departments'],
+            'visibleOptions' => $options['visibleOptions'],
+            'editableOptions' => $options['editableOptions'],
+        ]);
     }
 
     public function storeContent(): void
@@ -189,17 +298,23 @@ class DashboardController extends Controller
         Middleware::auth();
         $contents = $_SESSION['contents'] ?? $this->defaultContents();
         $ids = array_column($contents, 'id');
+        $uploadedVideoUrl = $this->handleVideoUpload();
+        $manualVideoUrl = trim($_POST['video_url'] ?? '');
+
         $contents[] = [
             'id' => empty($ids) ? 1 : (max($ids) + 1),
             'title' => trim($_POST['title'] ?? ''),
+            'description' => trim($_POST['description'] ?? ''),
             'type' => trim($_POST['type'] ?? 'Vídeo'),
             'department' => trim($_POST['department'] ?? ''),
             'visible_for' => trim($_POST['visible_for'] ?? ''),
             'editable_by' => trim($_POST['editable_by'] ?? ''),
-            'video_url' => trim($_POST['video_url'] ?? ''),
+            'video_url' => $uploadedVideoUrl !== '' ? $uploadedVideoUrl : $manualVideoUrl,
         ];
         $_SESSION['contents'] = $contents;
-        $_SESSION['success'] = 'Conteúdo adicionado com sucesso.';
+        if (!isset($_SESSION['error'])) {
+            $_SESSION['success'] = 'Conteúdo adicionado com sucesso.';
+        }
         $this->redirect('/admin/contents');
     }
 
