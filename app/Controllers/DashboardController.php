@@ -333,49 +333,63 @@ class DashboardController extends Controller
         ];
     }
 
-    private function handleVideoUpload(): string
+    private function handleContentUpload(string $type): string
     {
-        if (!isset($_FILES['video_file']) || !is_array($_FILES['video_file'])) {
+        if (!isset($_FILES['content_file']) || !is_array($_FILES['content_file'])) {
             return '';
         }
 
-        $file = $_FILES['video_file'];
+        $file = $_FILES['content_file'];
         $error = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
         if ($error === UPLOAD_ERR_NO_FILE) {
             return '';
         }
 
         if ($error !== UPLOAD_ERR_OK) {
-            $_SESSION['error'] = 'Falha no upload do vídeo. Tente novamente.';
+            $_SESSION['error'] = 'Falha no upload do ficheiro. Tente novamente.';
             return '';
         }
 
         $tmpName = (string)($file['tmp_name'] ?? '');
         if ($tmpName === '' || !is_uploaded_file($tmpName)) {
-            $_SESSION['error'] = 'Ficheiro de vídeo inválido.';
+            $_SESSION['error'] = 'Ficheiro inválido.';
             return '';
         }
 
         $extension = strtolower((string)pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
-        $allowed = ['mp4', 'webm', 'mov', 'm4v'];
+        $normalizedType = mb_strtolower(trim($type));
+
+        if ($normalizedType === 'pdf') {
+            $allowed = ['pdf'];
+            $uploadDir = APP_ROOT . '/public/uploads/pdfs';
+            $prefix = 'pdf_';
+            $errorMessage = 'Formato de ficheiro não suportado para PDF. Use apenas PDF.';
+            $publicDir = '/uploads/pdfs/';
+        } else {
+            $allowed = ['mp4', 'webm', 'mov', 'm4v'];
+            $uploadDir = APP_ROOT . '/public/uploads/videos';
+            $prefix = 'video_';
+            $errorMessage = 'Formato de vídeo não suportado. Use MP4, WEBM, MOV ou M4V.';
+            $publicDir = '/uploads/videos/';
+        }
+
         if (!in_array($extension, $allowed, true)) {
-            $_SESSION['error'] = 'Formato de vídeo não suportado. Use MP4, WEBM, MOV ou M4V.';
+            $_SESSION['error'] = $errorMessage;
             return '';
         }
 
-        $uploadDir = APP_ROOT . '/public/uploads/videos';
         if (!is_dir($uploadDir)) {
             @mkdir($uploadDir, 0775, true);
         }
 
-        $fileName = uniqid('video_', true) . '.' . $extension;
+        $fileName = uniqid($prefix, true) . '.' . $extension;
         $destination = $uploadDir . '/' . $fileName;
         if (!@move_uploaded_file($tmpName, $destination)) {
             $_SESSION['error'] = 'Não foi possível guardar o vídeo no servidor.';
             return '';
         }
 
-        return url('/uploads/videos/' . $fileName);
+        return url($publicDir . $fileName);
     }
 
     private function findContentById(int $id): ?array
@@ -430,7 +444,7 @@ class DashboardController extends Controller
         Middleware::auth();
         $contents = $_SESSION['contents'] ?? $this->defaultContents();
         $ids = array_column($contents, 'id');
-        $uploadedVideoUrl = $this->handleVideoUpload();
+        $uploadedFileUrl = $this->handleContentUpload(trim($_POST['type'] ?? 'Vídeo'));
         $manualVideoUrl = trim($_POST['video_url'] ?? '');
 
         $contents[] = [
@@ -441,7 +455,7 @@ class DashboardController extends Controller
             'department' => trim($_POST['department'] ?? ''),
             'visible_for' => trim($_POST['visible_for'] ?? ''),
             'editable_by' => trim($_POST['editable_by'] ?? ''),
-            'video_url' => $uploadedVideoUrl !== '' ? $uploadedVideoUrl : $manualVideoUrl,
+            'video_url' => $uploadedFileUrl !== '' ? $uploadedFileUrl : $manualVideoUrl,
         ];
         $_SESSION['contents'] = $contents;
         if (!isset($_SESSION['error'])) {
@@ -495,7 +509,7 @@ class DashboardController extends Controller
         Middleware::auth();
         $id = (int)($_POST['id'] ?? 0);
         $contents = $_SESSION['contents'] ?? $this->defaultContents();
-        $uploadedVideoUrl = $this->handleVideoUpload();
+        $uploadedFileUrl = $this->handleContentUpload(trim($_POST['type'] ?? 'Vídeo'));
 
         foreach ($contents as &$content) {
             if ((int)($content['id'] ?? 0) !== $id) {
@@ -510,8 +524,8 @@ class DashboardController extends Controller
             $content['editable_by'] = trim($_POST['editable_by'] ?? '');
 
             $manualVideoUrl = trim($_POST['video_url'] ?? '');
-            if ($uploadedVideoUrl !== '') {
-                $content['video_url'] = $uploadedVideoUrl;
+            if ($uploadedFileUrl !== '') {
+                $content['video_url'] = $uploadedFileUrl;
             } elseif ($manualVideoUrl !== '') {
                 $content['video_url'] = $manualVideoUrl;
             }

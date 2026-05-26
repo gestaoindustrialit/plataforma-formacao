@@ -59,7 +59,7 @@
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="col-md-5"><input type="file" name="video_file" class="form-control" accept="video/mp4,video/webm,video/quicktime,.m4v"></div>
+        <div class="col-md-5"><input type="file" name="content_file" class="form-control" accept="video/mp4,video/webm,video/quicktime,.m4v,application/pdf,.pdf"></div>
         <div class="col-md-4"><input name="video_url" class="form-control" placeholder="URL vídeo (opcional como alternativa ao upload)"></div>
         <div class="col-md-3"><button class="btn btn-dark w-100" type="submit">+ Adicionar Conteúdo</button></div>
     </form>
