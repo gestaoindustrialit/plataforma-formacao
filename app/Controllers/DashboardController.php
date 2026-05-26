@@ -357,7 +357,7 @@ class DashboardController extends Controller
         }
 
         $extension = strtolower((string)pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
-        $normalizedType = mb_strtolower(trim($type));
+        $normalizedType = strtolower(trim($type));
 
         if ($normalizedType === 'pdf') {
             $allowed = ['pdf'];
@@ -385,7 +385,7 @@ class DashboardController extends Controller
         $fileName = uniqid($prefix, true) . '.' . $extension;
         $destination = $uploadDir . '/' . $fileName;
         if (!@move_uploaded_file($tmpName, $destination)) {
-            $_SESSION['error'] = 'Não foi possível guardar o vídeo no servidor.';
+            $_SESSION['error'] = 'Não foi possível guardar o ficheiro no servidor.';
             return '';
         }
 
