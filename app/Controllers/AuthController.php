@@ -11,6 +11,10 @@ class AuthController extends Controller
 {
     public function loginForm(): void
     {
+        if (Auth::check()) {
+            $this->redirect('/dashboard');
+        }
+
         $this->view('auth/login', ['title' => 'Login']);
     }
 
