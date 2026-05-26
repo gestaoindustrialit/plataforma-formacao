@@ -15,7 +15,9 @@
     </style>
 </head>
 <body>
-<?php include __DIR__ . '/../partials/navbar.php'; ?>
+<?php if (\App\Core\Auth::check()): ?>
+    <?php include __DIR__ . '/../partials/navbar.php'; ?>
+<?php endif; ?>
 <main class="container py-4">
     <?php include __DIR__ . '/../partials/alerts.php'; include $viewFile; ?>
 </main>
