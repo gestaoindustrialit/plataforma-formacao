@@ -32,13 +32,6 @@
                         <?php endforeach; ?>
                     </optgroup>
                 <?php endif; ?>
-                <?php if (!empty($visibleRoleOptions ?? [])): ?>
-                    <optgroup label="Papéis">
-                        <?php foreach ($visibleRoleOptions as $option): ?>
-                            <option value="<?= e($option) ?>"><?= e($option) ?></option>
-                        <?php endforeach; ?>
-                    </optgroup>
-                <?php endif; ?>
                 <?php foreach (($visibleExtraOptions ?? []) as $option): ?>
                     <option value="<?= e($option) ?>"><?= e($option) ?></option>
                 <?php endforeach; ?>
@@ -61,13 +54,6 @@
                         <?php endforeach; ?>
                     </optgroup>
                 <?php endif; ?>
-                <?php if (!empty($editableRoleOptions ?? [])): ?>
-                    <optgroup label="Papéis">
-                        <?php foreach ($editableRoleOptions as $option): ?>
-                            <option value="<?= e($option) ?>"><?= e($option) ?></option>
-                        <?php endforeach; ?>
-                    </optgroup>
-                <?php endif; ?>
                 <?php foreach (($editableExtraOptions ?? []) as $option): ?>
                     <option value="<?= e($option) ?>"><?= e($option) ?></option>
                 <?php endforeach; ?>
@@ -77,7 +63,7 @@
         <div class="col-md-4"><input name="video_url" class="form-control" placeholder="URL vídeo (opcional como alternativa ao upload)"></div>
         <div class="col-md-3"><button class="btn btn-dark w-100" type="submit">+ Adicionar Conteúdo</button></div>
     </form>
-    <div class="alert alert-secondary">Defina permissões por conteúdo: <strong>quem pode ver</strong> e <strong>quem pode editar</strong> (por utilizador, papel ou departamento).</div>
+    <div class="alert alert-secondary">Defina permissões por conteúdo: <strong>quem pode ver</strong> e <strong>quem pode editar</strong> (por utilizador ou departamento).</div>
     <table class="table">
         <thead><tr><th>Conteúdo</th><th>Descrição</th><th>Tipo</th><th>Visível para</th><th>Editável por</th><th></th></tr></thead>
         <tbody>
