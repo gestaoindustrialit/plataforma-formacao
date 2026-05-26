@@ -9,6 +9,7 @@ $mainLinks = [
     ['label' => 'Utilizadores', 'path' => '/admin/users'],
     ['label' => 'Permissões', 'path' => '/admin/permissions'],
     ['label' => 'Conteúdos', 'path' => '/admin/contents'],
+    ['label' => 'Ver Conteúdos', 'path' => '/contents'],
     ['label' => 'Know-how', 'path' => '/admin/knowledge'],
 ];
 ?>

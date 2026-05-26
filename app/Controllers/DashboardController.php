@@ -70,7 +70,8 @@ class DashboardController extends Controller
     public function profile(): void
     {
         Middleware::auth();
-        $this->view('profile/index', ['title' => 'Meu Perfil']);
+        $history = $_SESSION['content_history'] ?? [];
+        $this->view('profile/index', ['title' => 'Meu Perfil', 'contentHistory' => $history]);
     }
 
     public function users(): void
@@ -385,6 +386,32 @@ class DashboardController extends Controller
 
         return url('/uploads/videos/' . $fileName);
     }
+
+    private function findContentById(int $id): ?array
+    {
+        $contents = $_SESSION['contents'] ?? $this->defaultContents();
+        foreach ($contents as $content) {
+            if ((int)($content['id'] ?? 0) === $id) {
+                return $content;
+            }
+        }
+
+        return null;
+    }
+
+    private function pushViewHistory(array $content): void
+    {
+        $history = $_SESSION['content_history'] ?? [];
+        $history = array_values(array_filter($history, fn ($item) => (int)($item['id'] ?? 0) !== (int)$content['id']));
+        array_unshift($history, [
+            'id' => (int)$content['id'],
+            'title' => (string)($content['title'] ?? ''),
+            'type' => (string)($content['type'] ?? ''),
+            'viewed_at' => date('Y-m-d H:i:s'),
+        ]);
+        $_SESSION['content_history'] = array_slice($history, 0, 20);
+    }
+
     public function contents(): void
     {
         Middleware::auth();
@@ -442,6 +469,96 @@ class DashboardController extends Controller
         $_SESSION['contents'] = array_values($contents);
         $_SESSION['success'] = 'Conteúdo removido com sucesso.';
         $this->redirect('/admin/contents');
+    }
+
+
+    public function editContent(): void
+    {
+        Middleware::auth();
+        $id = (int)($_GET['id'] ?? 0);
+        $contents = $_SESSION['contents'] ?? $this->defaultContents();
+        $users = $_SESSION['users'] ?? $this->defaultUsers();
+        $options = $this->collectContentOptions($contents, $users);
+        $content = $this->findContentById($id);
+
+        if (!$content) {
+            $_SESSION['error'] = 'Conteúdo não encontrado.';
+            $this->redirect('/admin/contents');
+        }
+
+        $this->view('admin/contents/edit', [
+            'title' => 'Editar Conteúdo',
+            'content' => $content,
+            'departments' => $options['departments'],
+            'visibleDepartmentOptions' => $options['departments'],
+            'visibleUserOptions' => $options['userNames'],
+            'visibleRoleOptions' => $options['roleOptions'],
+            'visibleExtraOptions' => $options['extraVisibleOptions'],
+            'editableDepartmentOptions' => $options['departments'],
+            'editableUserOptions' => $options['userNames'],
+            'editableRoleOptions' => $options['roleOptions'],
+            'editableExtraOptions' => $options['extraEditableOptions'],
+        ]);
+    }
+
+    public function updateContent(): void
+    {
+        Middleware::auth();
+        $id = (int)($_POST['id'] ?? 0);
+        $contents = $_SESSION['contents'] ?? $this->defaultContents();
+        $uploadedVideoUrl = $this->handleVideoUpload();
+
+        foreach ($contents as &$content) {
+            if ((int)($content['id'] ?? 0) !== $id) {
+                continue;
+            }
+
+            $content['title'] = trim($_POST['title'] ?? '');
+            $content['description'] = trim($_POST['description'] ?? '');
+            $content['type'] = trim($_POST['type'] ?? 'Vídeo');
+            $content['department'] = trim($_POST['department'] ?? '');
+            $content['visible_for'] = trim($_POST['visible_for'] ?? '');
+            $content['editable_by'] = trim($_POST['editable_by'] ?? '');
+
+            $manualVideoUrl = trim($_POST['video_url'] ?? '');
+            if ($uploadedVideoUrl !== '') {
+                $content['video_url'] = $uploadedVideoUrl;
+            } elseif ($manualVideoUrl !== '') {
+                $content['video_url'] = $manualVideoUrl;
+            }
+        }
+        unset($content);
+
+        $_SESSION['contents'] = array_values($contents);
+        if (!isset($_SESSION['error'])) {
+            $_SESSION['success'] = 'Conteúdo atualizado com sucesso.';
+        }
+        $this->redirect('/admin/contents');
+    }
+
+    public function listContents(): void
+    {
+        Middleware::auth();
+        if (!isset($_SESSION['contents'])) {
+            $_SESSION['contents'] = $this->defaultContents();
+        }
+
+        $this->view('contents/index', ['title' => 'Conteúdos Disponíveis', 'contents' => $_SESSION['contents']]);
+    }
+
+    public function showContent(): void
+    {
+        Middleware::auth();
+        $id = (int)($_GET['id'] ?? 0);
+        $content = $this->findContentById($id);
+
+        if (!$content) {
+            $_SESSION['error'] = 'Conteúdo não encontrado.';
+            $this->redirect('/contents');
+        }
+
+        $this->pushViewHistory($content);
+        $this->view('contents/show', ['title' => $content['title'] ?? 'Conteúdo', 'content' => $content]);
     }
 
     public function knowledge(): void
