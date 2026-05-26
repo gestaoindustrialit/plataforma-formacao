@@ -77,7 +77,7 @@
                     <td>
                         <form method="post" action="<?= e(url('/admin/contents/delete')) ?>">
                             <input type="hidden" name="id" value="<?= (int)$content['id'] ?>">
-                            <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
+                            <a class="btn btn-sm btn-outline-secondary me-1" href="<?= e(url('/admin/contents/edit?id=' . (int)$content['id'])) ?>">Editar</a><button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
                         </form>
                     </td>
                 </tr>

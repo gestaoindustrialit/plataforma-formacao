@@ -21,6 +21,22 @@ $user = \App\Core\Auth::user() ?? [];
                 <label class="form-label text-muted">Perfil</label>
                 <div class="form-control bg-light"><?= e($user['role_name'] ?? 'Utilizador') ?></div>
             </div>
-        </div>
+
+        <hr>
+        <h2 class="h5 mb-3">Histórico de conteúdos vistos</h2>
+        <?php if (!empty($contentHistory ?? [])): ?>
+            <ul class="list-group">
+                <?php foreach ($contentHistory as $entry): ?>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span><strong><?= e($entry['title'] ?? '') ?></strong> <span class="text-muted">(<?= e($entry['type'] ?? '-') ?>)</span></span>
+                        <small class="text-muted"><?= e($entry['viewed_at'] ?? '') ?></small>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php else: ?>
+            <p class="text-muted mb-0">Ainda não visualizou conteúdos.</p>
+        <?php endif; ?>
+
+</div>
     </div>
 </div>

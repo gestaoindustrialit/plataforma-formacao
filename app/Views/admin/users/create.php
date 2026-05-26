@@ -4,6 +4,7 @@
         <form method="post" action="<?= url('/admin/users') ?>" class="row g-3">
             <div class="col-md-6"><label class="form-label">Nome</label><input name="name" class="form-control" required></div>
             <div class="col-md-6"><label class="form-label">Email</label><input type="email" name="email" class="form-control" required></div>
+            <div class="col-md-6"><label class="form-label">Password de acesso</label><input type="text" name="password" class="form-control" required></div>
             <div class="col-md-4"><label class="form-label">Função</label><input name="role" class="form-control" required></div>
             <div class="col-md-4"><label class="form-label">Departamento</label><input name="department" class="form-control" required></div>
             <div class="col-md-4"><label class="form-label">Estado</label><select name="status" class="form-select"><option>Ativo</option><option>Pendente</option><option>Inativo</option></select></div>
