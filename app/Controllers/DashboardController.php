@@ -40,9 +40,9 @@ class DashboardController extends Controller
     private function defaultUsers(): array
     {
         return [
-            ['id' => 1, 'name' => 'Ana Martins', 'email' => 'ana@empresa.pt', 'role' => 'Formadora', 'department' => 'Produção', 'status' => 'Ativo'],
-            ['id' => 2, 'name' => 'Carlos Silva', 'email' => 'carlos@empresa.pt', 'role' => 'Operador', 'department' => 'Qualidade', 'status' => 'Ativo'],
-            ['id' => 3, 'name' => 'Rita Costa', 'email' => 'rita@empresa.pt', 'role' => 'Gestora RH', 'department' => 'RH', 'status' => 'Pendente'],
+            ['id' => 1, 'name' => 'Ana Martins', 'email' => 'ana@empresa.pt', 'role' => 'Formadora', 'department' => 'Produção', 'status' => 'Ativo', 'password' => 'Ana@1234'],
+            ['id' => 2, 'name' => 'Carlos Silva', 'email' => 'carlos@empresa.pt', 'role' => 'Operador', 'department' => 'Qualidade', 'status' => 'Ativo', 'password' => 'Carlos@1234'],
+            ['id' => 3, 'name' => 'Rita Costa', 'email' => 'rita@empresa.pt', 'role' => 'Gestora RH', 'department' => 'RH', 'status' => 'Pendente', 'password' => 'Rita@1234'],
         ];
     }
 
@@ -101,6 +101,7 @@ class DashboardController extends Controller
             'role' => trim($_POST['role'] ?? ''),
             'department' => trim($_POST['department'] ?? ''),
             'status' => trim($_POST['status'] ?? 'Ativo'),
+            'password' => trim($_POST['password'] ?? ''),
         ];
 
         $this->saveUsers($users);
@@ -142,6 +143,10 @@ class DashboardController extends Controller
                 $u['role'] = trim($_POST['role'] ?? '');
                 $u['department'] = trim($_POST['department'] ?? '');
                 $u['status'] = trim($_POST['status'] ?? 'Ativo');
+                $newPassword = trim($_POST['password'] ?? '');
+                if ($newPassword !== '') {
+                    $u['password'] = $newPassword;
+                }
             }
         }
         unset($u);
