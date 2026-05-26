@@ -15,7 +15,11 @@ $router->get('/admin/users/edit', [DashboardController::class, 'editUserForm']);
 $router->post('/admin/users/update', [DashboardController::class, 'updateUser']);
 $router->post('/admin/users/delete', [DashboardController::class, 'deleteUser']);
 $router->get('/admin/permissions', [DashboardController::class, 'permissions']);
+$router->post('/admin/permissions/save', [DashboardController::class, 'savePermissions']);
 $router->get('/admin/contents', [DashboardController::class, 'contents']);
+$router->post('/admin/contents/store', [DashboardController::class, 'storeContent']);
+$router->post('/admin/contents/delete', [DashboardController::class, 'deleteContent']);
 $router->get('/admin/knowledge', [DashboardController::class, 'knowledge']);
+$router->post('/admin/knowledge/store', [DashboardController::class, 'storeKnowledgeNode']);
 
 $router->get('/', function () { header('Location: ' . url('/login')); });
