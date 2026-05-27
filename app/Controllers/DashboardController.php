@@ -24,8 +24,8 @@ class DashboardController extends Controller
     private function defaultContents(): array
     {
         return [
-            ['id' => 1, 'title' => 'Setup de Máquina X', 'type' => 'Vídeo', 'department' => 'Produção', 'visible_for' => 'Produção A/B', 'editable_by' => 'Formadores Produção', 'video_url' => 'https://www.w3schools.com/html/mov_bbb.mp4'],
-            ['id' => 2, 'title' => 'Checklist de Segurança', 'type' => 'PDF', 'department' => 'Global', 'visible_for' => 'Todos', 'editable_by' => 'Gestores + HSE', 'video_url' => ''],
+            ['id' => 1, 'title' => 'Setup de Máquina X', 'type' => 'Vídeo', 'department' => 'Produção', 'training_path' => 'Software > Solune > RH', 'visible_for' => 'Produção A/B', 'editable_by' => 'Formadores Produção', 'video_url' => 'https://www.w3schools.com/html/mov_bbb.mp4'],
+            ['id' => 2, 'title' => 'Checklist de Segurança', 'type' => 'PDF', 'department' => 'Global', 'training_path' => 'Software > Solune > Logística', 'visible_for' => 'Todos', 'editable_by' => 'Gestores + HSE', 'video_url' => ''],
         ];
     }
 
@@ -417,6 +417,14 @@ class DashboardController extends Controller
         $_SESSION['content_history'] = array_slice($history, 0, 20);
     }
 
+    private function getKnowledgePathOptions(): array
+    {
+        $nodes = $_SESSION['knowledge_nodes'] ?? $this->defaultKnowledgeNodes();
+        $paths = array_map(fn ($node) => trim((string)($node['path'] ?? '')), $nodes);
+
+        return array_values(array_filter($paths, fn ($path) => $path !== ''));
+    }
+
     public function contents(): void
     {
         Middleware::auth();
@@ -436,6 +444,7 @@ class DashboardController extends Controller
             'editableDepartmentOptions' => $options['departments'],
             'editableUserOptions' => $options['userNames'],
             'editableExtraOptions' => $options['extraEditableOptions'],
+            'knowledgePathOptions' => $this->getKnowledgePathOptions(),
         ]);
     }
 
@@ -456,6 +465,7 @@ class DashboardController extends Controller
             'visible_for' => trim($_POST['visible_for'] ?? ''),
             'editable_by' => trim($_POST['editable_by'] ?? ''),
             'video_url' => $uploadedFileUrl !== '' ? $uploadedFileUrl : $manualVideoUrl,
+            'training_path' => trim($_POST['training_path'] ?? ''),
         ];
         $_SESSION['contents'] = $contents;
         if (!isset($_SESSION['error'])) {
@@ -501,6 +511,7 @@ class DashboardController extends Controller
             'editableUserOptions' => $options['userNames'],
             'editableRoleOptions' => $options['roleOptions'],
             'editableExtraOptions' => $options['extraEditableOptions'],
+            'knowledgePathOptions' => $this->getKnowledgePathOptions(),
         ]);
     }
 
@@ -522,6 +533,7 @@ class DashboardController extends Controller
             $content['department'] = trim($_POST['department'] ?? '');
             $content['visible_for'] = trim($_POST['visible_for'] ?? '');
             $content['editable_by'] = trim($_POST['editable_by'] ?? '');
+            $content['training_path'] = trim($_POST['training_path'] ?? '');
 
             $manualVideoUrl = trim($_POST['video_url'] ?? '');
             if ($uploadedFileUrl !== '') {

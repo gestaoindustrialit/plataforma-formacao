@@ -16,6 +16,14 @@
             </select>
         </div>
         <div class="col-md-2">
+            <select name="training_path" class="form-select" required>
+                <option value="">Formação (Know-how)</option>
+                <?php foreach (($knowledgePathOptions ?? []) as $path): ?>
+                    <option value="<?= e($path) ?>"><?= e($path) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-md-2">
             <select name="visible_for" class="form-select" required>
                 <option value="">Visível para</option>
                 <?php if (!empty($visibleDepartmentOptions ?? [])): ?>
@@ -65,13 +73,14 @@
     </form>
     <div class="alert alert-secondary">Defina permissões por conteúdo: <strong>quem pode ver</strong> e <strong>quem pode editar</strong> (por utilizador ou departamento).</div>
     <table class="table">
-        <thead><tr><th>Conteúdo</th><th>Descrição</th><th>Tipo</th><th>Visível para</th><th>Editável por</th><th></th></tr></thead>
+        <thead><tr><th>Conteúdo</th><th>Descrição</th><th>Tipo</th><th>Formação</th><th>Visível para</th><th>Editável por</th><th></th></tr></thead>
         <tbody>
             <?php foreach (($contents ?? []) as $content): ?>
                 <tr>
                     <td><?= e($content['title']) ?></td>
                     <td><?= e($content['description'] ?? '') ?></td>
                     <td><?= e($content['type']) ?></td>
+                    <td><?= e($content['training_path'] ?? '—') ?></td>
                     <td><?= e($content['visible_for']) ?></td>
                     <td><?= e($content['editable_by']) ?></td>
                     <td>
