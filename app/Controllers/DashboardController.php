@@ -572,8 +572,9 @@ class DashboardController extends Controller
     {
         Middleware::auth();
 
-        if ($this->isRequestTooLarge()) {
-            $_SESSION['error'] = 'O ficheiro excede o limite de upload do servidor. Reduza o tamanho do vídeo/PDF e tente novamente.';
+        $contentLength = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+        if ($contentLength > 0 && empty($_POST) && empty($_FILES)) {
+            $_SESSION['error'] = 'Upload rejeitado pela configuração do servidor. Garanta limite mínimo de 15MB em post_max_size/upload_max_filesize.';
             $this->redirect('/admin/contents');
         }
 
