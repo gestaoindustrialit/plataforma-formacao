@@ -81,15 +81,21 @@ class DashboardController extends Controller
         return array_values($normalized);
     }
 
-    private function saveKnowledgeNodes(array $nodes): void
+    private function saveKnowledgeNodes(array $nodes): bool
     {
         $path = $this->knowledgeStoragePath();
         $dir = dirname($path);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0775, true);
+
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return false;
         }
 
-        file_put_contents($path, json_encode(array_values($nodes), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        $payload = json_encode(array_values($nodes), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        if ($payload === false) {
+            return false;
+        }
+
+        return file_put_contents($path, $payload, LOCK_EX) !== false;
     }
 
     private function buildKnowledgeTree(array $nodes): array
@@ -679,13 +685,28 @@ class DashboardController extends Controller
     {
         Middleware::auth();
         $path = trim($_POST['path'] ?? '');
+
         if ($path !== '') {
             $nodes = $this->loadKnowledgeNodes();
+
+            foreach ($nodes as $node) {
+                if (strcasecmp((string)$node['path'], $path) === 0) {
+                    $_SESSION['error'] = 'A estrutura indicada já existe.';
+                    $this->redirect('/admin/knowledge');
+                }
+            }
+
             $ids = array_column($nodes, 'id');
             $nodes[] = ['id' => empty($ids) ? 1 : (max($ids) + 1), 'path' => $path];
-            $_SESSION['knowledge_nodes'] = $nodes;
-            $_SESSION['success'] = 'Estrutura criada com sucesso.';
+            usort($nodes, fn ($a, $b) => strnatcasecmp($a['path'], $b['path']));
+
+            if ($this->saveKnowledgeNodes($nodes)) {
+                $_SESSION['success'] = 'Estrutura criada com sucesso.';
+            } else {
+                $_SESSION['error'] = 'Não foi possível guardar a estrutura. Verifique permissões da pasta storage.';
+            }
         }
+
         $this->redirect('/admin/knowledge');
     }
 }
