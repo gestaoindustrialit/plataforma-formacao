@@ -444,15 +444,17 @@ class DashboardController extends Controller
         $extension = strtolower((string)pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
         $normalizedType = strtolower(trim($type));
 
+        $appRoot = dirname(__DIR__, 2);
+
         if ($normalizedType === 'pdf') {
             $allowed = ['pdf'];
-            $uploadDir = APP_ROOT . '/public/uploads/pdfs';
+            $uploadDir = $appRoot . '/public/uploads/pdfs';
             $prefix = 'pdf_';
             $errorMessage = 'Formato de ficheiro não suportado para PDF. Use apenas PDF.';
             $publicDir = '/uploads/pdfs/';
         } else {
             $allowed = ['mp4', 'webm', 'mov', 'm4v'];
-            $uploadDir = APP_ROOT . '/public/uploads/videos';
+            $uploadDir = $appRoot . '/public/uploads/videos';
             $prefix = 'video_';
             $errorMessage = 'Formato de vídeo não suportado. Use MP4, WEBM, MOV ou M4V.';
             $publicDir = '/uploads/videos/';
