@@ -37,6 +37,91 @@ class DashboardController extends Controller
         ];
     }
 
+
+    private function knowledgeStoragePath(): string
+    {
+        return dirname(__DIR__, 2) . '/storage/knowledge_nodes.json';
+    }
+
+    private function loadKnowledgeNodes(): array
+    {
+        $path = $this->knowledgeStoragePath();
+
+        if (!is_file($path)) {
+            $defaults = $this->defaultKnowledgeNodes();
+            $this->saveKnowledgeNodes($defaults);
+            return $defaults;
+        }
+
+        $raw = file_get_contents($path);
+        if ($raw === false) {
+            return $this->defaultKnowledgeNodes();
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return $this->defaultKnowledgeNodes();
+        }
+
+        $normalized = [];
+        foreach ($decoded as $index => $node) {
+            $pathValue = trim((string)($node['path'] ?? ''));
+            if ($pathValue === '') {
+                continue;
+            }
+
+            $normalized[] = [
+                'id' => (int)($node['id'] ?? ($index + 1)),
+                'path' => $pathValue,
+            ];
+        }
+
+        usort($normalized, fn ($a, $b) => strnatcasecmp($a['path'], $b['path']));
+
+        return array_values($normalized);
+    }
+
+    private function saveKnowledgeNodes(array $nodes): bool
+    {
+        $path = $this->knowledgeStoragePath();
+        $dir = dirname($path);
+
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return false;
+        }
+
+        $payload = json_encode(array_values($nodes), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        if ($payload === false) {
+            return false;
+        }
+
+        return file_put_contents($path, $payload, LOCK_EX) !== false;
+    }
+
+    private function buildKnowledgeTree(array $nodes): array
+    {
+        $tree = [];
+
+        foreach ($nodes as $node) {
+            $segments = array_values(array_filter(array_map('trim', explode('>', (string)($node['path'] ?? '')))));
+            if (empty($segments)) {
+                continue;
+            }
+
+            $cursor = &$tree;
+            foreach ($segments as $segment) {
+                if (!isset($cursor[$segment])) {
+                    $cursor[$segment] = [];
+                }
+                $cursor = &$cursor[$segment];
+            }
+            unset($cursor);
+        }
+
+        ksort($tree, SORT_NATURAL | SORT_FLAG_CASE);
+        return $tree;
+    }
+
     private function defaultUsers(): array
     {
         return [
@@ -428,7 +513,7 @@ class DashboardController extends Controller
 
     private function getKnowledgePathOptions(): array
     {
-        $nodes = $_SESSION['knowledge_nodes'] ?? $this->defaultKnowledgeNodes();
+        $nodes = $this->loadKnowledgeNodes();
         $paths = array_map(fn ($node) => trim((string)($node['path'] ?? '')), $nodes);
 
         return array_values(array_filter($paths, fn ($path) => $path !== ''));
@@ -588,23 +673,40 @@ class DashboardController extends Controller
     public function knowledge(): void
     {
         Middleware::auth();
-        if (!isset($_SESSION['knowledge_nodes'])) {
-            $_SESSION['knowledge_nodes'] = $this->defaultKnowledgeNodes();
-        }
-        $this->view('admin/knowledge/index', ['title' => 'Departamentos e Pastas de Conhecimento', 'knowledgeNodes' => $_SESSION['knowledge_nodes']]);
+        $nodes = $this->loadKnowledgeNodes();
+        $this->view('admin/knowledge/index', [
+            'title' => 'Departamentos e Pastas de Conhecimento',
+            'knowledgeNodes' => $nodes,
+            'knowledgeTree' => $this->buildKnowledgeTree($nodes),
+        ]);
     }
 
     public function storeKnowledgeNode(): void
     {
         Middleware::auth();
         $path = trim($_POST['path'] ?? '');
+
         if ($path !== '') {
-            $nodes = $_SESSION['knowledge_nodes'] ?? $this->defaultKnowledgeNodes();
+            $nodes = $this->loadKnowledgeNodes();
+
+            foreach ($nodes as $node) {
+                if (strcasecmp((string)$node['path'], $path) === 0) {
+                    $_SESSION['error'] = 'A estrutura indicada já existe.';
+                    $this->redirect('/admin/knowledge');
+                }
+            }
+
             $ids = array_column($nodes, 'id');
             $nodes[] = ['id' => empty($ids) ? 1 : (max($ids) + 1), 'path' => $path];
-            $_SESSION['knowledge_nodes'] = $nodes;
-            $_SESSION['success'] = 'Estrutura criada com sucesso.';
+            usort($nodes, fn ($a, $b) => strnatcasecmp($a['path'], $b['path']));
+
+            if ($this->saveKnowledgeNodes($nodes)) {
+                $_SESSION['success'] = 'Estrutura criada com sucesso.';
+            } else {
+                $_SESSION['error'] = 'Não foi possível guardar a estrutura. Verifique permissões da pasta storage.';
+            }
         }
+
         $this->redirect('/admin/knowledge');
     }
 }
