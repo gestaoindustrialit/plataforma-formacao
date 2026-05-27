@@ -486,6 +486,32 @@ class DashboardController extends Controller
         return url($publicDir . $fileName);
     }
 
+    private function parseSizeToBytes(string $value): int
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return 0;
+        }
+
+        $unit = strtolower(substr($trimmed, -1));
+        $number = (float)$trimmed;
+
+        return match ($unit) {
+            'g' => (int)($number * 1024 * 1024 * 1024),
+            'm' => (int)($number * 1024 * 1024),
+            'k' => (int)($number * 1024),
+            default => (int)$number,
+        };
+    }
+
+    private function isRequestTooLarge(): bool
+    {
+        $contentLength = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+        $postMaxSize = $this->parseSizeToBytes((string)ini_get('post_max_size'));
+
+        return $postMaxSize > 0 && $contentLength > $postMaxSize;
+    }
+
     private function findContentById(int $id): ?array
     {
         $contents = $_SESSION['contents'] ?? $this->defaultContents();
@@ -545,21 +571,51 @@ class DashboardController extends Controller
     public function storeContent(): void
     {
         Middleware::auth();
+
+        if ($this->isRequestTooLarge()) {
+            $_SESSION['error'] = 'O ficheiro excede o limite de upload do servidor. Reduza o tamanho do vídeo/PDF e tente novamente.';
+            $this->redirect('/admin/contents');
+        }
+
         $contents = $_SESSION['contents'] ?? $this->defaultContents();
         $ids = array_column($contents, 'id');
-        $uploadedFileUrl = $this->handleContentUpload(trim($_POST['type'] ?? 'Vídeo'));
+
+        $type = trim($_POST['type'] ?? 'Vídeo');
+        $title = trim($_POST['title'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        $department = trim($_POST['department'] ?? '');
+        $visibleFor = trim($_POST['visible_for'] ?? '');
+        $editableBy = trim($_POST['editable_by'] ?? '');
+        $trainingPath = trim($_POST['training_path'] ?? '');
         $manualVideoUrl = trim($_POST['video_url'] ?? '');
+        $uploadedFileUrl = $this->handleContentUpload($type);
+
+        if ($title === '' || $description === '' || $department === '' || $visibleFor === '' || $editableBy === '' || $trainingPath === '') {
+            $_SESSION['error'] = 'Preencha todos os campos obrigatórios antes de adicionar o conteúdo.';
+            $this->redirect('/admin/contents');
+        }
+
+        if ($uploadedFileUrl === '' && $manualVideoUrl === '') {
+            if (isset($_SESSION['error']) && $_SESSION['error'] !== '') {
+                $this->redirect('/admin/contents');
+            }
+
+            $_SESSION['error'] = $type === 'PDF'
+                ? 'Adicione um ficheiro PDF para guardar o conteúdo.'
+                : 'Adicione um ficheiro de vídeo ou uma URL de vídeo para guardar o conteúdo.';
+            $this->redirect('/admin/contents');
+        }
 
         $contents[] = [
             'id' => empty($ids) ? 1 : (max($ids) + 1),
-            'title' => trim($_POST['title'] ?? ''),
-            'description' => trim($_POST['description'] ?? ''),
-            'type' => trim($_POST['type'] ?? 'Vídeo'),
-            'department' => trim($_POST['department'] ?? ''),
-            'visible_for' => trim($_POST['visible_for'] ?? ''),
-            'editable_by' => trim($_POST['editable_by'] ?? ''),
+            'title' => $title,
+            'description' => $description,
+            'type' => $type,
+            'department' => $department,
+            'visible_for' => $visibleFor,
+            'editable_by' => $editableBy,
             'video_url' => $uploadedFileUrl !== '' ? $uploadedFileUrl : $manualVideoUrl,
-            'training_path' => trim($_POST['training_path'] ?? ''),
+            'training_path' => $trainingPath,
         ];
         $_SESSION['contents'] = $contents;
         if (!isset($_SESSION['error'])) {
