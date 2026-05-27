@@ -6,7 +6,7 @@
         <div class="col-md-9"><input name="path" class="form-control" placeholder="Ex: Software > Solune > RH" required></div>
         <div class="col-md-3"><button class="btn btn-dark w-100" type="submit">+ Criar Estrutura</button></div>
     </form>
-    <p class="text-muted">Estrutura recomendada para retenção de know-how: Departamento → Pasta de Processo → Bloco de Formação → Conteúdo + Quiz + checklist prática.</p>
+    <p class="text-muted">Estrutura recomendada para retenção de know-how: Departamento → Assunto/Pasta → Formação (1+ vídeos) → Conteúdo + Quiz + checklist prática.</p>
     <div class="row g-3">
         <div class="col-12">
             <div class="border rounded p-3">
@@ -16,6 +16,33 @@
                         <li><?= e($node['path']) ?></li>
                     <?php endforeach; ?>
                 </ul>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="border rounded p-3">
+                <h2 class="h6">Estrutura em pastas/formações</h2>
+                <?php
+                $renderTree = function (array $tree) use (&$renderTree): void {
+                    if (empty($tree)) {
+                        return;
+                    }
+                    echo '<ul class="mb-0">';
+                    foreach ($tree as $name => $children) {
+                        echo '<li>' . e((string)$name);
+                        if (!empty($children)) {
+                            $renderTree($children);
+                        }
+                        echo '</li>';
+                    }
+                    echo '</ul>';
+                };
+                ?>
+                <?php if (!empty($knowledgeTree ?? [])): ?>
+                    <?php $renderTree($knowledgeTree); ?>
+                <?php else: ?>
+                    <p class="text-muted mb-0">Sem estruturas ainda.</p>
+                <?php endif; ?>
             </div>
         </div>
         <div class="col-md-6">
