@@ -545,21 +545,52 @@ class DashboardController extends Controller
     public function storeContent(): void
     {
         Middleware::auth();
+
+        $contentLength = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+        if ($contentLength > 0 && empty($_POST) && empty($_FILES)) {
+            $_SESSION['error'] = 'Upload rejeitado pela configuração do servidor. Garanta limite mínimo de 15MB em post_max_size/upload_max_filesize.';
+            $this->redirect('/admin/contents');
+        }
+
         $contents = $_SESSION['contents'] ?? $this->defaultContents();
         $ids = array_column($contents, 'id');
-        $uploadedFileUrl = $this->handleContentUpload(trim($_POST['type'] ?? 'Vídeo'));
+
+        $type = trim($_POST['type'] ?? 'Vídeo');
+        $title = trim($_POST['title'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        $department = trim($_POST['department'] ?? '');
+        $visibleFor = trim($_POST['visible_for'] ?? '');
+        $editableBy = trim($_POST['editable_by'] ?? '');
+        $trainingPath = trim($_POST['training_path'] ?? '');
         $manualVideoUrl = trim($_POST['video_url'] ?? '');
+        $uploadedFileUrl = $this->handleContentUpload($type);
+
+        if ($title === '' || $description === '' || $department === '' || $visibleFor === '' || $editableBy === '' || $trainingPath === '') {
+            $_SESSION['error'] = 'Preencha todos os campos obrigatórios antes de adicionar o conteúdo.';
+            $this->redirect('/admin/contents');
+        }
+
+        if ($uploadedFileUrl === '' && $manualVideoUrl === '') {
+            if (isset($_SESSION['error']) && $_SESSION['error'] !== '') {
+                $this->redirect('/admin/contents');
+            }
+
+            $_SESSION['error'] = $type === 'PDF'
+                ? 'Adicione um ficheiro PDF para guardar o conteúdo.'
+                : 'Adicione um ficheiro de vídeo ou uma URL de vídeo para guardar o conteúdo.';
+            $this->redirect('/admin/contents');
+        }
 
         $contents[] = [
             'id' => empty($ids) ? 1 : (max($ids) + 1),
-            'title' => trim($_POST['title'] ?? ''),
-            'description' => trim($_POST['description'] ?? ''),
-            'type' => trim($_POST['type'] ?? 'Vídeo'),
-            'department' => trim($_POST['department'] ?? ''),
-            'visible_for' => trim($_POST['visible_for'] ?? ''),
-            'editable_by' => trim($_POST['editable_by'] ?? ''),
+            'title' => $title,
+            'description' => $description,
+            'type' => $type,
+            'department' => $department,
+            'visible_for' => $visibleFor,
+            'editable_by' => $editableBy,
             'video_url' => $uploadedFileUrl !== '' ? $uploadedFileUrl : $manualVideoUrl,
-            'training_path' => trim($_POST['training_path'] ?? ''),
+            'training_path' => $trainingPath,
         ];
         $_SESSION['contents'] = $contents;
         if (!isset($_SESSION['error'])) {
