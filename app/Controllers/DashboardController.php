@@ -486,6 +486,32 @@ class DashboardController extends Controller
         return url($publicDir . $fileName);
     }
 
+    private function parseSizeToBytes(string $value): int
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return 0;
+        }
+
+        $unit = strtolower(substr($trimmed, -1));
+        $number = (float)$trimmed;
+
+        return match ($unit) {
+            'g' => (int)($number * 1024 * 1024 * 1024),
+            'm' => (int)($number * 1024 * 1024),
+            'k' => (int)($number * 1024),
+            default => (int)$number,
+        };
+    }
+
+    private function isRequestTooLarge(): bool
+    {
+        $contentLength = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+        $postMaxSize = $this->parseSizeToBytes((string)ini_get('post_max_size'));
+
+        return $postMaxSize > 0 && $contentLength > $postMaxSize;
+    }
+
     private function findContentById(int $id): ?array
     {
         $contents = $_SESSION['contents'] ?? $this->defaultContents();
