@@ -539,6 +539,60 @@ class DashboardController extends Controller
         $_SESSION['content_history'] = array_slice($history, 0, 20);
     }
 
+
+    private function sortContentTrainingTree(array &$node): void
+    {
+        $groups = array_filter(array_keys($node), fn ($key) => $key !== '_contents');
+        natcasesort($groups);
+
+        $sorted = [];
+        foreach ($groups as $group) {
+            if (is_array($node[$group])) {
+                $this->sortContentTrainingTree($node[$group]);
+            }
+            $sorted[$group] = $node[$group];
+        }
+
+        if (isset($node['_contents'])) {
+            usort($node['_contents'], fn ($a, $b) => strnatcasecmp((string)($a['title'] ?? ''), (string)($b['title'] ?? '')));
+            $sorted['_contents'] = $node['_contents'];
+        }
+
+        $node = $sorted;
+    }
+
+    private function buildContentTrainingTree(array $contents): array
+    {
+        $tree = [];
+
+        foreach ($contents as $content) {
+            $path = trim((string)($content['training_path'] ?? ''));
+            $segments = array_values(array_filter(array_map('trim', explode('>', $path)), fn ($segment) => $segment !== ''));
+
+            if (empty($segments)) {
+                $segments = ['Sem formação'];
+            }
+
+            $cursor = &$tree;
+            foreach ($segments as $segment) {
+                if (!isset($cursor[$segment])) {
+                    $cursor[$segment] = [];
+                }
+                $cursor = &$cursor[$segment];
+            }
+
+            if (!isset($cursor['_contents'])) {
+                $cursor['_contents'] = [];
+            }
+            $cursor['_contents'][] = $content;
+            unset($cursor);
+        }
+
+        $this->sortContentTrainingTree($tree);
+
+        return $tree;
+    }
+
     private function getKnowledgePathOptions(): array
     {
         $nodes = $this->loadKnowledgeNodes();
@@ -711,7 +765,13 @@ class DashboardController extends Controller
             $_SESSION['contents'] = $this->defaultContents();
         }
 
-        $this->view('contents/index', ['title' => 'Conteúdos Disponíveis', 'contents' => $_SESSION['contents']]);
+        $contents = $_SESSION['contents'];
+
+        $this->view('contents/index', [
+            'title' => 'Conteúdos Disponíveis',
+            'contents' => $contents,
+            'contentTrainingTree' => $this->buildContentTrainingTree($contents),
+        ]);
     }
 
     public function showContent(): void
