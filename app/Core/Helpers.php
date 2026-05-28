@@ -22,3 +22,16 @@ function url(string $path = ''): string
     $path = '/' . ltrim($path, '/');
     return base_path_url() . ($path === '/' ? '' : $path);
 }
+
+function media_mime_type(string $path): string
+{
+    $extension = strtolower((string)pathinfo(parse_url($path, PHP_URL_PATH) ?: $path, PATHINFO_EXTENSION));
+
+    return match ($extension) {
+        'mp4', 'm4v' => 'video/mp4',
+        'webm' => 'video/webm',
+        'mov' => 'video/quicktime',
+        'pdf' => 'application/pdf',
+        default => '',
+    };
+}

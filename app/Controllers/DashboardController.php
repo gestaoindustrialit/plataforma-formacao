@@ -418,6 +418,65 @@ class DashboardController extends Controller
         ];
     }
 
+    private function findExecutable(string $name): string
+    {
+        if (!function_exists('shell_exec')) {
+            return '';
+        }
+
+        $command = 'command -v ' . escapeshellarg($name) . ' 2>/dev/null';
+        $path = trim((string)shell_exec($command));
+
+        return is_executable($path) ? $path : '';
+    }
+
+    private function transcodeVideoForBrowser(string $sourcePath, string $uploadDir): string
+    {
+        if (!function_exists('exec')) {
+            return '';
+        }
+
+        $ffmpeg = $this->findExecutable('ffmpeg');
+        if ($ffmpeg === '') {
+            return '';
+        }
+
+        $outputFileName = uniqid('video_', true) . '.mp4';
+        $outputPath = $uploadDir . '/' . $outputFileName;
+        $command = implode(' ', [
+            escapeshellarg($ffmpeg),
+            escapeshellarg('-y'),
+            escapeshellarg('-i'),
+            escapeshellarg($sourcePath),
+            escapeshellarg('-map') . ' ' . escapeshellarg('0:v:0'),
+            escapeshellarg('-map') . ' ' . escapeshellarg('0:a?'),
+            escapeshellarg('-c:v') . ' ' . escapeshellarg('libx264'),
+            escapeshellarg('-profile:v') . ' ' . escapeshellarg('high'),
+            escapeshellarg('-level') . ' ' . escapeshellarg('4.1'),
+            escapeshellarg('-pix_fmt') . ' ' . escapeshellarg('yuv420p'),
+            escapeshellarg('-preset') . ' ' . escapeshellarg('veryfast'),
+            escapeshellarg('-movflags') . ' ' . escapeshellarg('+faststart'),
+            escapeshellarg('-c:a') . ' ' . escapeshellarg('aac'),
+            escapeshellarg('-b:a') . ' ' . escapeshellarg('128k'),
+            escapeshellarg($outputPath),
+            '2>&1',
+        ]);
+
+        $output = [];
+        $exitCode = 1;
+        exec($command, $output, $exitCode);
+
+        if ($exitCode !== 0 || !is_file($outputPath) || filesize($outputPath) === 0) {
+            if (is_file($outputPath)) {
+                @unlink($outputPath);
+            }
+
+            return '';
+        }
+
+        return $outputFileName;
+    }
+
     private function handleContentUpload(string $type): string
     {
         if (!isset($_FILES['content_file']) || !is_array($_FILES['content_file'])) {
@@ -483,6 +542,18 @@ class DashboardController extends Controller
         if (!move_uploaded_file($tmpName, $destination)) {
             $_SESSION['error'] = 'Não foi possível guardar o ficheiro no servidor. Verifique permissões da pasta de upload.';
             return '';
+        }
+
+        if ($normalizedType !== 'pdf') {
+            $transcodedFileName = $this->transcodeVideoForBrowser($destination, $uploadDir);
+            if ($transcodedFileName !== '') {
+                @unlink($destination);
+                $fileName = $transcodedFileName;
+            } elseif (in_array($extension, ['mov', 'm4v'], true)) {
+                @unlink($destination);
+                $_SESSION['error'] = 'O vídeo foi recebido, mas precisa de conversão para MP4 (H.264/AAC) antes de tocar no browser. Instale/ative FFmpeg no servidor ou envie um MP4 já convertido.';
+                return '';
+            }
         }
 
         return url($publicDir . $fileName);
