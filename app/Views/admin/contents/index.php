@@ -67,7 +67,7 @@
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="col-md-5"><input type="file" name="content_file" class="form-control" accept="video/mp4,video/webm,video/quicktime,.m4v,application/pdf,.pdf"></div>
+        <div class="col-md-5"><input type="file" name="content_file" class="form-control" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v,application/pdf,.pdf"><div class="form-text">Uploads de vídeo são normalizados para MP4 H.264/AAC e requerem FFmpeg ativo no servidor. Em alternativa, use uma URL externa já compatível.</div></div>
         <div class="col-md-4"><input name="video_url" class="form-control" placeholder="URL vídeo (opcional como alternativa ao upload)"></div>
         <div class="col-md-3"><button class="btn btn-dark w-100" type="submit">+ Adicionar Conteúdo</button></div>
     </form>
@@ -98,7 +98,11 @@
         <h2 class="h5">Pré-visualização do vídeo</h2>
         <?php $video = ''; foreach (($contents ?? []) as $item) { if (($item['type'] ?? '') === 'Vídeo' && !empty($item['video_url'])) { $video = $item['video_url']; break; }} ?>
         <?php if ($video): ?>
-            <video controls playsinline preload="metadata" style="width:100%;max-height:420px;border-radius:8px;" src="<?= e($video) ?>"></video>
+            <video controls playsinline preload="metadata" style="width:100%;max-height:420px;border-radius:8px;">
+                <source src="<?= e($video) ?>" type="<?= e(media_mime_type($video)) ?>">
+                O seu browser não consegue reproduzir este vídeo.
+            </video>
+            <small class="text-muted d-block mt-2">Se o player ficar em 0:00, confirme que o ficheiro é MP4 H.264/AAC ou ative FFmpeg para conversão no upload.</small>
         <?php else: ?>
             <p class="text-muted mb-0">Adicione um conteúdo do tipo vídeo com upload ou URL para ativar o player.</p>
         <?php endif; ?>
