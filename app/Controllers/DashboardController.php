@@ -29,6 +29,130 @@ class DashboardController extends Controller
         ];
     }
 
+    private function contentsStoragePath(): string
+    {
+        return dirname(__DIR__, 2) . '/storage/contents.json';
+    }
+
+    private function normalizeContent(array $content, int $fallbackId): array
+    {
+        return [
+            'id' => (int)($content['id'] ?? $fallbackId),
+            'title' => trim((string)($content['title'] ?? '')),
+            'description' => trim((string)($content['description'] ?? '')),
+            'type' => trim((string)($content['type'] ?? 'Vídeo')),
+            'department' => trim((string)($content['department'] ?? '')),
+            'training_path' => trim((string)($content['training_path'] ?? '')),
+            'visible_for' => trim((string)($content['visible_for'] ?? '')),
+            'editable_by' => trim((string)($content['editable_by'] ?? '')),
+            'video_url' => trim((string)($content['video_url'] ?? '')),
+        ];
+    }
+
+    private function loadContents(): array
+    {
+        $path = $this->contentsStoragePath();
+
+        if (!is_file($path)) {
+            $contents = isset($_SESSION['contents']) && is_array($_SESSION['contents'])
+                ? $_SESSION['contents']
+                : $this->defaultContents();
+            $this->saveContents($contents);
+
+            $normalized = [];
+            foreach ($contents as $content) {
+                if (is_array($content)) {
+                    $normalized[] = $this->normalizeContent($content, count($normalized) + 1);
+                }
+            }
+
+            return array_values($normalized);
+        }
+
+        $raw = file_get_contents($path);
+        if ($raw === false || trim($raw) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        $contents = [];
+        foreach ($decoded as $content) {
+            if (!is_array($content)) {
+                continue;
+            }
+
+            $normalized = $this->normalizeContent($content, count($contents) + 1);
+            if ($normalized['id'] <= 0 || $normalized['title'] === '') {
+                continue;
+            }
+
+            $contents[] = $normalized;
+        }
+
+        return array_values($contents);
+    }
+
+    private function saveContents(array $contents): bool
+    {
+        $path = $this->contentsStoragePath();
+        $dir = dirname($path);
+
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return false;
+        }
+
+        $normalized = [];
+        foreach ($contents as $content) {
+            if (!is_array($content)) {
+                continue;
+            }
+
+            $normalized[] = $this->normalizeContent($content, count($normalized) + 1);
+        }
+
+        $payload = json_encode(array_values($normalized), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($payload === false) {
+            return false;
+        }
+
+        if (file_put_contents($path, $payload, LOCK_EX) === false) {
+            return false;
+        }
+
+        $_SESSION['contents'] = array_values($normalized);
+        return true;
+    }
+
+    private function localPublicPathFromUrl(string $url): string
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+        if (!is_string($path) || $path === '') {
+            return '';
+        }
+
+        $uploadsPosition = strpos($path, '/uploads/');
+        if ($uploadsPosition === false) {
+            return '';
+        }
+
+        $relativePath = substr($path, $uploadsPosition + 1);
+        $relativePath = str_replace(['..', '\\'], '', $relativePath);
+
+        return dirname(__DIR__, 2) . '/public/' . $relativePath;
+    }
+
+    private function deleteLocalContentFile(string $url): void
+    {
+        $path = $this->localPublicPathFromUrl($url);
+        if ($path !== '' && is_file($path)) {
+            @unlink($path);
+        }
+    }
+
     private function defaultKnowledgeNodes(): array
     {
         return [
@@ -368,15 +492,20 @@ class DashboardController extends Controller
     {
         $departments = [];
         $userNames = [];
+        $roleOptions = [];
 
         foreach ($users as $user) {
             $department = trim((string)($user['department'] ?? ''));
             $name = trim((string)($user['name'] ?? ''));
+            $role = trim((string)($user['role'] ?? ''));
             if ($department !== '') {
                 $departments[] = $department;
             }
             if ($name !== '') {
                 $userNames[] = $name;
+            }
+            if ($role !== '') {
+                $roleOptions[] = $role;
             }
         }
 
@@ -402,17 +531,20 @@ class DashboardController extends Controller
 
         $departments = array_values(array_unique($departments));
         $userNames = array_values(array_unique($userNames));
+        $roleOptions = array_values(array_unique($roleOptions));
         $extraVisibleOptions = array_values(array_unique($extraVisibleOptions));
         $extraEditableOptions = array_values(array_unique($extraEditableOptions));
 
         sort($departments);
         sort($userNames);
+        sort($roleOptions);
         sort($extraVisibleOptions);
         sort($extraEditableOptions);
 
         return [
             'departments' => $departments,
             'userNames' => $userNames,
+            'roleOptions' => $roleOptions,
             'extraVisibleOptions' => $extraVisibleOptions,
             'extraEditableOptions' => $extraEditableOptions,
         ];
@@ -546,14 +678,14 @@ class DashboardController extends Controller
 
         if ($normalizedType !== 'pdf') {
             $transcodedFileName = $this->transcodeVideoForBrowser($destination, $uploadDir);
-            if ($transcodedFileName !== '') {
+            if ($transcodedFileName === '') {
                 @unlink($destination);
-                $fileName = $transcodedFileName;
-            } elseif (in_array($extension, ['mov', 'm4v'], true)) {
-                @unlink($destination);
-                $_SESSION['error'] = 'O vídeo foi recebido, mas precisa de conversão para MP4 (H.264/AAC) antes de tocar no browser. Instale/ative FFmpeg no servidor ou envie um MP4 já convertido.';
+                $_SESSION['error'] = 'O vídeo foi recebido, mas não foi possível normalizá-lo para MP4 com codecs H.264/AAC. Ative o FFmpeg no servidor para uploads de vídeo ou use uma URL externa já compatível.';
                 return '';
             }
+
+            @unlink($destination);
+            $fileName = $transcodedFileName;
         }
 
         return url($publicDir . $fileName);
@@ -587,7 +719,7 @@ class DashboardController extends Controller
 
     private function findContentById(int $id): ?array
     {
-        $contents = $_SESSION['contents'] ?? $this->defaultContents();
+        $contents = $this->loadContents();
         foreach ($contents as $content) {
             if ((int)($content['id'] ?? 0) === $id) {
                 return $content;
@@ -675,15 +807,13 @@ class DashboardController extends Controller
     public function contents(): void
     {
         Middleware::auth();
-        if (!isset($_SESSION['contents'])) {
-            $_SESSION['contents'] = $this->defaultContents();
-        }
+        $contents = $this->loadContents();
         $users = $_SESSION['users'] ?? $this->defaultUsers();
-        $options = $this->collectContentOptions($_SESSION['contents'], $users);
+        $options = $this->collectContentOptions($contents, $users);
 
         $this->view('admin/contents/index', [
             'title' => 'Conteúdos de Formação',
-            'contents' => $_SESSION['contents'],
+            'contents' => $contents,
             'departments' => $options['departments'],
             'visibleDepartmentOptions' => $options['departments'],
             'visibleUserOptions' => $options['userNames'],
@@ -705,7 +835,7 @@ class DashboardController extends Controller
             $this->redirect('/admin/contents');
         }
 
-        $contents = $_SESSION['contents'] ?? $this->defaultContents();
+        $contents = $this->loadContents();
         $ids = array_column($contents, 'id');
 
         $type = trim($_POST['type'] ?? 'Vídeo');
@@ -720,6 +850,10 @@ class DashboardController extends Controller
 
         if ($title === '' || $description === '' || $department === '' || $visibleFor === '' || $editableBy === '' || $trainingPath === '') {
             $_SESSION['error'] = 'Preencha todos os campos obrigatórios antes de adicionar o conteúdo.';
+            $this->redirect('/admin/contents');
+        }
+
+        if (isset($_SESSION['error']) && $_SESSION['error'] !== '') {
             $this->redirect('/admin/contents');
         }
 
@@ -745,9 +879,10 @@ class DashboardController extends Controller
             'video_url' => $uploadedFileUrl !== '' ? $uploadedFileUrl : $manualVideoUrl,
             'training_path' => $trainingPath,
         ];
-        $_SESSION['contents'] = $contents;
-        if (!isset($_SESSION['error'])) {
+        if ($this->saveContents($contents)) {
             $_SESSION['success'] = 'Conteúdo adicionado com sucesso.';
+        } else {
+            $_SESSION['error'] = 'Não foi possível guardar o conteúdo. Verifique permissões da pasta storage.';
         }
         $this->redirect('/admin/contents');
     }
@@ -756,9 +891,24 @@ class DashboardController extends Controller
     {
         Middleware::auth();
         $id = (int)($_POST['id'] ?? 0);
-        $contents = array_filter($_SESSION['contents'] ?? [], fn ($content) => (int)$content['id'] !== $id);
-        $_SESSION['contents'] = array_values($contents);
-        $_SESSION['success'] = 'Conteúdo removido com sucesso.';
+        $contents = $this->loadContents();
+        $contentToDelete = null;
+        foreach ($contents as $content) {
+            if ((int)($content['id'] ?? 0) === $id) {
+                $contentToDelete = $content;
+                break;
+            }
+        }
+
+        $contents = array_values(array_filter($contents, fn ($content) => (int)$content['id'] !== $id));
+        if ($this->saveContents($contents)) {
+            if ($contentToDelete) {
+                $this->deleteLocalContentFile((string)($contentToDelete['video_url'] ?? ''));
+            }
+            $_SESSION['success'] = 'Conteúdo removido com sucesso.';
+        } else {
+            $_SESSION['error'] = 'Não foi possível remover o conteúdo. Verifique permissões da pasta storage.';
+        }
         $this->redirect('/admin/contents');
     }
 
@@ -767,7 +917,7 @@ class DashboardController extends Controller
     {
         Middleware::auth();
         $id = (int)($_GET['id'] ?? 0);
-        $contents = $_SESSION['contents'] ?? $this->defaultContents();
+        $contents = $this->loadContents();
         $users = $_SESSION['users'] ?? $this->defaultUsers();
         $options = $this->collectContentOptions($contents, $users);
         $content = $this->findContentById($id);
@@ -797,13 +947,21 @@ class DashboardController extends Controller
     {
         Middleware::auth();
         $id = (int)($_POST['id'] ?? 0);
-        $contents = $_SESSION['contents'] ?? $this->defaultContents();
+        $contents = $this->loadContents();
         $uploadedFileUrl = $this->handleContentUpload(trim($_POST['type'] ?? 'Vídeo'));
+        if (isset($_SESSION['error']) && $_SESSION['error'] !== '') {
+            $this->redirect('/admin/contents/edit?id=' . $id);
+        }
 
+        $oldVideoUrl = '';
+        $contentFound = false;
         foreach ($contents as &$content) {
             if ((int)($content['id'] ?? 0) !== $id) {
                 continue;
             }
+
+            $contentFound = true;
+            $oldVideoUrl = (string)($content['video_url'] ?? '');
 
             $content['title'] = trim($_POST['title'] ?? '');
             $content['description'] = trim($_POST['description'] ?? '');
@@ -822,9 +980,20 @@ class DashboardController extends Controller
         }
         unset($content);
 
-        $_SESSION['contents'] = array_values($contents);
-        if (!isset($_SESSION['error'])) {
-            $_SESSION['success'] = 'Conteúdo atualizado com sucesso.';
+        if (!$contentFound) {
+            $_SESSION['error'] = 'Conteúdo não encontrado.';
+            $this->redirect('/admin/contents');
+        }
+
+        if ($this->saveContents(array_values($contents))) {
+            if ($uploadedFileUrl !== '' && $oldVideoUrl !== '' && $oldVideoUrl !== $uploadedFileUrl) {
+                $this->deleteLocalContentFile($oldVideoUrl);
+            }
+            if (!isset($_SESSION['error'])) {
+                $_SESSION['success'] = 'Conteúdo atualizado com sucesso.';
+            }
+        } else {
+            $_SESSION['error'] = 'Não foi possível atualizar o conteúdo. Verifique permissões da pasta storage.';
         }
         $this->redirect('/admin/contents');
     }
@@ -832,17 +1001,9 @@ class DashboardController extends Controller
     public function listContents(): void
     {
         Middleware::auth();
-        if (!isset($_SESSION['contents'])) {
-            $_SESSION['contents'] = $this->defaultContents();
-        }
+        $contents = $this->loadContents();
 
-        $contents = $_SESSION['contents'];
-
-        $this->view('contents/index', [
-            'title' => 'Conteúdos Disponíveis',
-            'contents' => $contents,
-            'contentTrainingTree' => $this->buildContentTrainingTree($contents),
-        ]);
+        $this->view('contents/index', ['title' => 'Conteúdos Disponíveis', 'contents' => $contents]);
     }
 
     public function showContent(): void

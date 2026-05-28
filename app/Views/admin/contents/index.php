@@ -67,7 +67,7 @@
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="col-md-5"><input type="file" name="content_file" class="form-control" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v,application/pdf,.pdf"><div class="form-text">Para vídeo, prefira MP4 H.264/AAC. MOV/M4V são convertidos para MP4 quando FFmpeg está disponível no servidor.</div></div>
+        <div class="col-md-5"><input type="file" name="content_file" class="form-control" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v,application/pdf,.pdf"><div class="form-text">Uploads de vídeo são normalizados para MP4 H.264/AAC e requerem FFmpeg ativo no servidor. Em alternativa, use uma URL externa já compatível.</div></div>
         <div class="col-md-4"><input name="video_url" class="form-control" placeholder="URL vídeo (opcional como alternativa ao upload)"></div>
         <div class="col-md-3"><button class="btn btn-dark w-100" type="submit">+ Adicionar Conteúdo</button></div>
     </form>
