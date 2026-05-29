@@ -2,10 +2,32 @@
 namespace App\Controllers;
 
 use App\Core\Controller;
+use App\Core\Database;
 use App\Core\Middleware;
 
 class DashboardController extends Controller
 {
+    private ?Database $database = null;
+
+    private function db(): Database
+    {
+        if ($this->database === null) {
+            $this->database = new Database(require __DIR__ . '/../../config/database.php');
+            $this->initializePersistenceSchema();
+        }
+
+        return $this->database;
+    }
+
+    private function initializePersistenceSchema(): void
+    {
+        $pdo = $this->database->pdo();
+        $pdo->exec('CREATE TABLE IF NOT EXISTS departments (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT, status TEXT DEFAULT "active", created_at TEXT, updated_at TEXT)');
+        $pdo->exec('CREATE TABLE IF NOT EXISTS roles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT, is_admin INTEGER DEFAULT 0, created_at TEXT, updated_at TEXT)');
+        $pdo->exec('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT UNIQUE, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, department_id INTEGER NULL, role_id INTEGER NOT NULL, status TEXT DEFAULT "active", must_change_password INTEGER DEFAULT 0, last_login_at TEXT NULL, created_at TEXT, updated_at TEXT, FOREIGN KEY(department_id) REFERENCES departments(id), FOREIGN KEY(role_id) REFERENCES roles(id))');
+        $pdo->exec('CREATE TABLE IF NOT EXISTS training_contents (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT DEFAULT "", type TEXT NOT NULL DEFAULT "Vídeo", department TEXT NOT NULL DEFAULT "", training_path TEXT NOT NULL DEFAULT "", visible_for TEXT NOT NULL DEFAULT "", editable_by TEXT NOT NULL DEFAULT "", video_url TEXT NOT NULL DEFAULT "", created_at TEXT, updated_at TEXT)');
+    }
+
     private function defaultProfiles(): array
     {
         return ['Formador', 'Operador', 'Gestor', 'Admin'];
@@ -29,9 +51,17 @@ class DashboardController extends Controller
         ];
     }
 
-    private function contentsStoragePath(): string
+    private function loadInitialContents(): array
     {
-        return dirname(__DIR__, 2) . '/storage/contents.json';
+        $legacyPath = dirname(__DIR__, 2) . '/storage/contents.json';
+        if (is_file($legacyPath)) {
+            $decoded = json_decode((string)file_get_contents($legacyPath), true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return $this->defaultContents();
     }
 
     private function normalizeContent(array $content, int $fallbackId): array
@@ -49,43 +79,24 @@ class DashboardController extends Controller
         ];
     }
 
+    private function ensureContentRows(): void
+    {
+        $count = (int)$this->db()->fetch('SELECT COUNT(*) AS total FROM training_contents')['total'];
+        if ($count > 0) {
+            return;
+        }
+
+        $this->saveContents($this->loadInitialContents());
+    }
+
     private function loadContents(): array
     {
-        $path = $this->contentsStoragePath();
-
-        if (!is_file($path)) {
-            $contents = isset($_SESSION['contents']) && is_array($_SESSION['contents'])
-                ? $_SESSION['contents']
-                : $this->defaultContents();
-            $this->saveContents($contents);
-
-            $normalized = [];
-            foreach ($contents as $content) {
-                if (is_array($content)) {
-                    $normalized[] = $this->normalizeContent($content, count($normalized) + 1);
-                }
-            }
-
-            return array_values($normalized);
-        }
-
-        $raw = file_get_contents($path);
-        if ($raw === false || trim($raw) === '') {
-            return [];
-        }
-
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            return [];
-        }
+        $this->ensureContentRows();
+        $rows = $this->db()->fetchAll('SELECT id, title, description, type, department, training_path, visible_for, editable_by, video_url FROM training_contents ORDER BY id');
 
         $contents = [];
-        foreach ($decoded as $content) {
-            if (!is_array($content)) {
-                continue;
-            }
-
-            $normalized = $this->normalizeContent($content, count($contents) + 1);
+        foreach ($rows as $row) {
+            $normalized = $this->normalizeContent($row, count($contents) + 1);
             if ($normalized['id'] <= 0 || $normalized['title'] === '') {
                 continue;
             }
@@ -98,33 +109,79 @@ class DashboardController extends Controller
 
     private function saveContents(array $contents): bool
     {
-        $path = $this->contentsStoragePath();
-        $dir = dirname($path);
+        $pdo = $this->db()->pdo();
 
-        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
-            return false;
-        }
+        try {
+            $pdo->beginTransaction();
+            $pdo->exec('DELETE FROM training_contents');
+            $stmt = $pdo->prepare('INSERT INTO training_contents (id, title, description, type, department, training_path, visible_for, editable_by, video_url, created_at, updated_at) VALUES (:id, :title, :description, :type, :department, :training_path, :visible_for, :editable_by, :video_url, datetime("now"), datetime("now"))');
 
-        $normalized = [];
-        foreach ($contents as $content) {
-            if (!is_array($content)) {
-                continue;
+            $normalized = [];
+            foreach ($contents as $content) {
+                if (!is_array($content)) {
+                    continue;
+                }
+
+                $item = $this->normalizeContent($content, count($normalized) + 1);
+                $stmt->execute([
+                    'id' => $item['id'],
+                    'title' => $item['title'],
+                    'description' => $item['description'],
+                    'type' => $item['type'],
+                    'department' => $item['department'],
+                    'training_path' => $item['training_path'],
+                    'visible_for' => $item['visible_for'],
+                    'editable_by' => $item['editable_by'],
+                    'video_url' => $item['video_url'],
+                ]);
+                $normalized[] = $item;
             }
 
-            $normalized[] = $this->normalizeContent($content, count($normalized) + 1);
-        }
+            $pdo->commit();
+            $_SESSION['contents'] = array_values($normalized);
+            return true;
+        } catch (\Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
 
-        $payload = json_encode(array_values($normalized), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if ($payload === false) {
             return false;
         }
+    }
 
-        if (file_put_contents($path, $payload, LOCK_EX) === false) {
+    private function insertContent(array $content): bool
+    {
+        try {
+            $item = $this->normalizeContent($content, 0);
+            $this->db()->query('INSERT INTO training_contents (title, description, type, department, training_path, visible_for, editable_by, video_url, created_at, updated_at) VALUES (:title, :description, :type, :department, :training_path, :visible_for, :editable_by, :video_url, datetime("now"), datetime("now"))', [
+                'title' => $item['title'],
+                'description' => $item['description'],
+                'type' => $item['type'],
+                'department' => $item['department'],
+                'training_path' => $item['training_path'],
+                'visible_for' => $item['visible_for'],
+                'editable_by' => $item['editable_by'],
+                'video_url' => $item['video_url'],
+            ]);
+            return true;
+        } catch (\Throwable $exception) {
             return false;
         }
+    }
 
-        $_SESSION['contents'] = array_values($normalized);
-        return true;
+    private function replaceContents(array $contents): bool
+    {
+        return $this->saveContents($contents);
+    }
+
+    private function deleteContentById(int $id): bool
+    {
+        try {
+            $this->db()->delete('training_contents', 'id = :id', ['id' => $id]);
+            return true;
+        } catch (\Throwable $exception) {
+            return false;
+        }
     }
 
     private function localPublicPathFromUrl(string $url): string
@@ -255,9 +312,17 @@ class DashboardController extends Controller
         ];
     }
 
-    private function usersStoragePath(): string
+    private function loadInitialUsers(): array
     {
-        return dirname(__DIR__, 2) . '/storage/users.json';
+        $legacyPath = dirname(__DIR__, 2) . '/storage/users.json';
+        if (is_file($legacyPath)) {
+            $decoded = json_decode((string)file_get_contents($legacyPath), true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return $this->defaultUsers();
     }
 
     private function normalizeUser(array $user, int $fallbackId): array
@@ -273,79 +338,240 @@ class DashboardController extends Controller
         ];
     }
 
+    private function statusToDatabase(string $status): string
+    {
+        return match ($status) {
+            'Ativo' => 'active',
+            'Pendente' => 'pending',
+            'Inativo' => 'inactive',
+            default => $status !== '' ? $status : 'active',
+        };
+    }
+
+    private function statusFromDatabase(string $status): string
+    {
+        return match ($status) {
+            'active' => 'Ativo',
+            'pending' => 'Pendente',
+            'inactive' => 'Inativo',
+            default => $status !== '' ? $status : 'Ativo',
+        };
+    }
+
+    private function ensureRoleId(string $name): int
+    {
+        $name = trim($name) !== '' ? trim($name) : 'Colaborador';
+        $role = $this->db()->fetch('SELECT id FROM roles WHERE name = :name LIMIT 1', ['name' => $name]);
+        if ($role) {
+            return (int)$role['id'];
+        }
+
+        return $this->db()->insert('roles', [
+            'name' => $name,
+            'description' => $name,
+            'is_admin' => in_array($name, ['Super Admin', 'Administrador', 'Admin'], true) ? 1 : 0,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+    }
+
+    private function ensureDepartmentId(string $name): ?int
+    {
+        $name = trim($name);
+        if ($name === '') {
+            return null;
+        }
+
+        $department = $this->db()->fetch('SELECT id FROM departments WHERE name = :name LIMIT 1', ['name' => $name]);
+        if ($department) {
+            return (int)$department['id'];
+        }
+
+        return $this->db()->insert('departments', [
+            'name' => $name,
+            'description' => '',
+            'status' => 'active',
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+    }
+
+    private function usernameFromEmail(string $email, int $fallbackId): string
+    {
+        $username = trim((string)strstr($email, '@', true));
+        if ($username === '') {
+            $username = 'utilizador' . $fallbackId;
+        }
+
+        return preg_replace('/[^A-Za-z0-9_.-]/', '', $username) ?: 'utilizador' . $fallbackId;
+    }
+
+    private function uniqueUsername(string $baseUsername, ?int $ignoreUserId = null): string
+    {
+        $baseUsername = $baseUsername !== '' ? $baseUsername : 'utilizador';
+        $username = $baseUsername;
+        $suffix = 2;
+
+        while (true) {
+            $params = ['username' => $username];
+            $sql = 'SELECT id FROM users WHERE username = :username';
+            if ($ignoreUserId !== null) {
+                $sql .= ' AND id != :id';
+                $params['id'] = $ignoreUserId;
+            }
+
+            $existing = $this->db()->fetch($sql . ' LIMIT 1', $params);
+            if (!$existing) {
+                return $username;
+            }
+
+            $username = $baseUsername . $suffix;
+            $suffix++;
+        }
+    }
+
+    private function passwordForDatabase(string $password): string
+    {
+        if ($password === '') {
+            $password = bin2hex(random_bytes(8));
+        }
+
+        $info = password_get_info($password);
+        return $info['algo'] !== 0 ? $password : password_hash($password, PASSWORD_DEFAULT);
+    }
+
+    private function rowToUser(array $row): array
+    {
+        return [
+            'id' => (int)$row['id'],
+            'name' => (string)$row['name'],
+            'email' => (string)($row['email'] ?? ''),
+            'role' => (string)($row['role'] ?? ''),
+            'department' => (string)($row['department'] ?? ''),
+            'status' => $this->statusFromDatabase((string)($row['status'] ?? 'active')),
+            'password' => '',
+        ];
+    }
+
+    private function ensureUserRows(): void
+    {
+        $count = (int)$this->db()->fetch('SELECT COUNT(*) AS total FROM users')['total'];
+        if ($count > 0) {
+            return;
+        }
+
+        $this->saveUsers($this->loadInitialUsers());
+    }
+
     private function getUsers(): array
     {
-        $path = $this->usersStoragePath();
+        $this->ensureUserRows();
+        $rows = $this->db()->fetchAll('SELECT u.id, u.name, u.email, u.status, r.name AS role, COALESCE(d.name, "") AS department FROM users u JOIN roles r ON r.id = u.role_id LEFT JOIN departments d ON d.id = u.department_id ORDER BY u.id');
 
-        if (!is_file($path)) {
-            $users = isset($_SESSION['users']) && is_array($_SESSION['users'])
-                ? $_SESSION['users']
-                : $this->defaultUsers();
-            $this->saveUsers($users);
+        return array_map(fn ($row) => $this->rowToUser($row), $rows);
+    }
 
-            return $_SESSION['users'] ?? array_values($users);
-        }
-
-        $raw = file_get_contents($path);
-        if ($raw === false || trim($raw) === '') {
-            $_SESSION['users'] = [];
-            return [];
-        }
-
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            $users = $this->defaultUsers();
-            $_SESSION['users'] = $users;
-            return $users;
-        }
-
-        $users = [];
-        foreach ($decoded as $user) {
-            if (!is_array($user)) {
-                continue;
+    private function insertUserRecord(array $user): bool
+    {
+        try {
+            $item = $this->normalizeUser($user, 0);
+            if ($item['name'] === '') {
+                return false;
             }
 
-            $normalized = $this->normalizeUser($user, count($users) + 1);
-            if ($normalized['id'] <= 0 || $normalized['name'] === '') {
-                continue;
+            $this->db()->query('INSERT INTO users (name, email, username, password, department_id, role_id, status, must_change_password, created_at, updated_at) VALUES (:name, :email, :username, :password, :department_id, :role_id, :status, 0, datetime("now"), datetime("now"))', [
+                'name' => $item['name'],
+                'email' => $item['email'],
+                'username' => $this->uniqueUsername($this->usernameFromEmail($item['email'], time())),
+                'password' => $this->passwordForDatabase($item['password']),
+                'department_id' => $this->ensureDepartmentId($item['department']),
+                'role_id' => $this->ensureRoleId($item['role']),
+                'status' => $this->statusToDatabase($item['status']),
+            ]);
+            return true;
+        } catch (\Throwable $exception) {
+            return false;
+        }
+    }
+
+    private function updateUserRecord(int $id, array $user, string $newPassword): bool
+    {
+        try {
+            $item = $this->normalizeUser($user, $id);
+            $data = [
+                'name' => $item['name'],
+                'email' => $item['email'],
+                'department_id' => $this->ensureDepartmentId($item['department']),
+                'role_id' => $this->ensureRoleId($item['role']),
+                'status' => $this->statusToDatabase($item['status']),
+                'updated_at' => date('Y-m-d H:i:s'),
+                'username' => $this->uniqueUsername($this->usernameFromEmail($item['email'], $id), $id),
+            ];
+
+            if ($newPassword !== '') {
+                $data['password'] = $this->passwordForDatabase($newPassword);
             }
 
-            $users[] = $normalized;
+            $this->db()->update('users', $data, 'id = :id', ['id' => $id]);
+            return true;
+        } catch (\Throwable $exception) {
+            return false;
         }
+    }
 
-        $_SESSION['users'] = array_values($users);
-        return array_values($users);
+    private function deleteUserById(int $id): bool
+    {
+        try {
+            $this->db()->delete('users', 'id = :id', ['id' => $id]);
+            return true;
+        } catch (\Throwable $exception) {
+            return false;
+        }
     }
 
     private function saveUsers(array $users): bool
     {
-        $path = $this->usersStoragePath();
-        $dir = dirname($path);
+        $pdo = $this->db()->pdo();
 
-        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
-            return false;
-        }
+        try {
+            $pdo->beginTransaction();
+            $pdo->exec('DELETE FROM users');
+            $stmt = $pdo->prepare('INSERT INTO users (id, name, email, username, password, department_id, role_id, status, must_change_password, created_at, updated_at) VALUES (:id, :name, :email, :username, :password, :department_id, :role_id, :status, 0, datetime("now"), datetime("now"))');
 
-        $normalized = [];
-        foreach ($users as $user) {
-            if (!is_array($user)) {
-                continue;
+            $normalized = [];
+            foreach ($users as $user) {
+                if (!is_array($user)) {
+                    continue;
+                }
+
+                $item = $this->normalizeUser($user, count($normalized) + 1);
+                if ($item['name'] === '') {
+                    continue;
+                }
+
+                $stmt->execute([
+                    'id' => $item['id'],
+                    'name' => $item['name'],
+                    'email' => $item['email'],
+                    'username' => $this->uniqueUsername($this->usernameFromEmail($item['email'], $item['id'])),
+                    'password' => $this->passwordForDatabase($item['password']),
+                    'department_id' => $this->ensureDepartmentId($item['department']),
+                    'role_id' => $this->ensureRoleId($item['role']),
+                    'status' => $this->statusToDatabase($item['status']),
+                ]);
+                $normalized[] = $item;
             }
 
-            $normalized[] = $this->normalizeUser($user, count($normalized) + 1);
-        }
+            $pdo->commit();
+            $_SESSION['users'] = array_values($normalized);
+            return true;
+        } catch (\Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
 
-        $payload = json_encode(array_values($normalized), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if ($payload === false) {
             return false;
         }
-
-        if (file_put_contents($path, $payload, LOCK_EX) === false) {
-            return false;
-        }
-
-        $_SESSION['users'] = array_values($normalized);
-        return true;
     }
 
     public function index(): void
@@ -379,12 +605,7 @@ class DashboardController extends Controller
     public function storeUser(): void
     {
         Middleware::auth();
-        $users = $this->getUsers();
-        $ids = array_column($users, 'id');
-        $nextId = empty($ids) ? 1 : (max($ids) + 1);
-
-        $users[] = [
-            'id' => $nextId,
+        $user = [
             'name' => trim($_POST['name'] ?? ''),
             'email' => trim($_POST['email'] ?? ''),
             'role' => trim($_POST['role'] ?? ''),
@@ -393,10 +614,10 @@ class DashboardController extends Controller
             'password' => trim($_POST['password'] ?? ''),
         ];
 
-        if ($this->saveUsers($users)) {
+        if ($this->insertUserRecord($user)) {
             $_SESSION['success'] = 'Utilizador criado com sucesso.';
         } else {
-            $_SESSION['error'] = 'Não foi possível guardar o utilizador. Verifique permissões da pasta storage.';
+            $_SESSION['error'] = 'Não foi possível guardar o utilizador. Verifique a base de dados SQLite.';
         }
         $this->redirect('/admin/users');
     }
@@ -426,27 +647,20 @@ class DashboardController extends Controller
     {
         Middleware::auth();
         $id = (int)($_POST['id'] ?? 0);
-        $users = $this->getUsers();
+        $user = [
+            'id' => $id,
+            'name' => trim($_POST['name'] ?? ''),
+            'email' => trim($_POST['email'] ?? ''),
+            'role' => trim($_POST['role'] ?? ''),
+            'department' => trim($_POST['department'] ?? ''),
+            'status' => trim($_POST['status'] ?? 'Ativo'),
+        ];
+        $newPassword = trim($_POST['password'] ?? '');
 
-        foreach ($users as &$u) {
-            if ((int)$u['id'] === $id) {
-                $u['name'] = trim($_POST['name'] ?? '');
-                $u['email'] = trim($_POST['email'] ?? '');
-                $u['role'] = trim($_POST['role'] ?? '');
-                $u['department'] = trim($_POST['department'] ?? '');
-                $u['status'] = trim($_POST['status'] ?? 'Ativo');
-                $newPassword = trim($_POST['password'] ?? '');
-                if ($newPassword !== '') {
-                    $u['password'] = $newPassword;
-                }
-            }
-        }
-        unset($u);
-
-        if ($this->saveUsers($users)) {
+        if ($this->updateUserRecord($id, $user, $newPassword)) {
             $_SESSION['success'] = 'Utilizador atualizado com sucesso.';
         } else {
-            $_SESSION['error'] = 'Não foi possível atualizar o utilizador. Verifique permissões da pasta storage.';
+            $_SESSION['error'] = 'Não foi possível atualizar o utilizador. Verifique a base de dados SQLite.';
         }
         $this->redirect('/admin/users');
     }
@@ -455,11 +669,10 @@ class DashboardController extends Controller
     {
         Middleware::auth();
         $id = (int)($_POST['id'] ?? 0);
-        $users = array_values(array_filter($this->getUsers(), fn ($u) => (int)$u['id'] !== $id));
-        if ($this->saveUsers($users)) {
+        if ($this->deleteUserById($id)) {
             $_SESSION['success'] = 'Utilizador eliminado com sucesso.';
         } else {
-            $_SESSION['error'] = 'Não foi possível eliminar o utilizador. Verifique permissões da pasta storage.';
+            $_SESSION['error'] = 'Não foi possível eliminar o utilizador. Verifique a base de dados SQLite.';
         }
         $this->redirect('/admin/users');
     }
@@ -923,9 +1136,6 @@ class DashboardController extends Controller
             $this->redirect('/admin/contents');
         }
 
-        $contents = $this->loadContents();
-        $ids = array_column($contents, 'id');
-
         $type = trim($_POST['type'] ?? 'Vídeo');
         $title = trim($_POST['title'] ?? '');
         $description = trim($_POST['description'] ?? '');
@@ -956,8 +1166,7 @@ class DashboardController extends Controller
             $this->redirect('/admin/contents');
         }
 
-        $contents[] = [
-            'id' => empty($ids) ? 1 : (max($ids) + 1),
+        $content = [
             'title' => $title,
             'description' => $description,
             'type' => $type,
@@ -967,10 +1176,11 @@ class DashboardController extends Controller
             'video_url' => $uploadedFileUrl !== '' ? $uploadedFileUrl : $manualVideoUrl,
             'training_path' => $trainingPath,
         ];
-        if ($this->saveContents($contents)) {
+
+        if ($this->insertContent($content)) {
             $_SESSION['success'] = 'Conteúdo adicionado com sucesso.';
         } else {
-            $_SESSION['error'] = 'Não foi possível guardar o conteúdo. Verifique permissões da pasta storage.';
+            $_SESSION['error'] = 'Não foi possível guardar o conteúdo. Verifique a base de dados SQLite.';
         }
         $this->redirect('/admin/contents');
     }
@@ -988,14 +1198,13 @@ class DashboardController extends Controller
             }
         }
 
-        $contents = array_values(array_filter($contents, fn ($content) => (int)$content['id'] !== $id));
-        if ($this->saveContents($contents)) {
+        if ($this->deleteContentById($id)) {
             if ($contentToDelete) {
                 $this->deleteLocalContentFile((string)($contentToDelete['video_url'] ?? ''));
             }
             $_SESSION['success'] = 'Conteúdo removido com sucesso.';
         } else {
-            $_SESSION['error'] = 'Não foi possível remover o conteúdo. Verifique permissões da pasta storage.';
+            $_SESSION['error'] = 'Não foi possível remover o conteúdo. Verifique a base de dados SQLite.';
         }
         $this->redirect('/admin/contents');
     }
@@ -1073,7 +1282,7 @@ class DashboardController extends Controller
             $this->redirect('/admin/contents');
         }
 
-        if ($this->saveContents(array_values($contents))) {
+        if ($this->replaceContents(array_values($contents))) {
             if ($uploadedFileUrl !== '' && $oldVideoUrl !== '' && $oldVideoUrl !== $uploadedFileUrl) {
                 $this->deleteLocalContentFile($oldVideoUrl);
             }
@@ -1081,7 +1290,7 @@ class DashboardController extends Controller
                 $_SESSION['success'] = 'Conteúdo atualizado com sucesso.';
             }
         } else {
-            $_SESSION['error'] = 'Não foi possível atualizar o conteúdo. Verifique permissões da pasta storage.';
+            $_SESSION['error'] = 'Não foi possível atualizar o conteúdo. Verifique a base de dados SQLite.';
         }
         $this->redirect('/admin/contents');
     }
