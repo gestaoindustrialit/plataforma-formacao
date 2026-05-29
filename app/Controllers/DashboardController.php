@@ -979,14 +979,10 @@ class DashboardController extends Controller
 
         if ($normalizedType !== 'pdf') {
             $transcodedFileName = $this->transcodeVideoForBrowser($destination, $uploadDir);
-            if ($transcodedFileName === '') {
+            if ($transcodedFileName !== '') {
                 @unlink($destination);
-                $_SESSION['error'] = 'O vídeo foi recebido, mas não foi possível normalizá-lo para MP4 com codecs H.264/AAC. Ative o FFmpeg no servidor para uploads de vídeo ou use uma URL externa já compatível.';
-                return '';
+                $fileName = $transcodedFileName;
             }
-
-            @unlink($destination);
-            $fileName = $transcodedFileName;
         }
 
         return url($publicDir . $fileName);

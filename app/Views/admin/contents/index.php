@@ -67,8 +67,8 @@
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="col-md-5"><input type="file" name="content_file" class="form-control" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v,application/pdf,.pdf"><div class="form-text">Uploads de vídeo são normalizados para MP4 H.264/AAC e requerem FFmpeg ativo no servidor. Em alternativa, use uma URL externa já compatível.</div></div>
-        <div class="col-md-4"><input name="video_url" class="form-control" placeholder="URL vídeo (opcional como alternativa ao upload)"></div>
+        <div class="col-md-5"><input type="file" name="content_file" class="form-control" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v,application/pdf,.pdf"><div class="form-text">Pode carregar um ficheiro diretamente; se o FFmpeg estiver ativo, o vídeo será convertido automaticamente para MP4 compatível. A URL é apenas opcional.</div></div>
+        <div class="col-md-4"><input name="video_url" class="form-control" placeholder="URL vídeo (opcional)"></div>
         <div class="col-md-3"><button class="btn btn-dark w-100" type="submit">+ Adicionar Conteúdo</button></div>
     </form>
     <div class="alert alert-secondary">Defina permissões por conteúdo: <strong>quem pode ver</strong> e <strong>quem pode editar</strong> (por utilizador ou departamento).</div>
@@ -102,9 +102,9 @@
                 <source src="<?= e($video) ?>" type="<?= e(media_mime_type($video)) ?>">
                 O seu browser não consegue reproduzir este vídeo.
             </video>
-            <small class="text-muted d-block mt-2">Se o player ficar em 0:00, confirme que o ficheiro é MP4 H.264/AAC ou ative FFmpeg para conversão no upload.</small>
+            <small class="text-muted d-block mt-2">Se o player ficar em 0:00, carregue um MP4/WebM compatível com o browser ou ative FFmpeg para conversão automática.</small>
         <?php else: ?>
-            <p class="text-muted mb-0">Adicione um conteúdo do tipo vídeo com upload ou URL para ativar o player.</p>
+            <p class="text-muted mb-0">Adicione um conteúdo do tipo vídeo com ficheiro carregado para ativar o player. A URL é opcional.</p>
         <?php endif; ?>
     </div>
 </div></div>
