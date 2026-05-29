@@ -1,0 +1,24 @@
+[
+    {
+        "id": 1,
+        "title": "Setup de Máquina X",
+        "description": "",
+        "type": "Vídeo",
+        "department": "Produção",
+        "training_path": "Software > Solune > RH",
+        "visible_for": "Produção A/B",
+        "editable_by": "Formadores Produção",
+        "video_url": "https://www.w3schools.com/html/mov_bbb.mp4"
+    },
+    {
+        "id": 2,
+        "title": "Checklist de Segurança",
+        "description": "",
+        "type": "PDF",
+        "department": "Global",
+        "training_path": "Software > Solune > Logística",
+        "visible_for": "Todos",
+        "editable_by": "Gestores + HSE",
+        "video_url": ""
+    }
+]

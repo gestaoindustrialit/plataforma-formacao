@@ -255,18 +255,97 @@ class DashboardController extends Controller
         ];
     }
 
-    private function getUsers(): array
+    private function usersStoragePath(): string
     {
-        if (empty($_SESSION['users'])) {
-            $_SESSION['users'] = $this->defaultUsers();
-        }
-
-        return $_SESSION['users'];
+        return dirname(__DIR__, 2) . '/storage/users.json';
     }
 
-    private function saveUsers(array $users): void
+    private function normalizeUser(array $user, int $fallbackId): array
     {
+        return [
+            'id' => (int)($user['id'] ?? $fallbackId),
+            'name' => trim((string)($user['name'] ?? '')),
+            'email' => trim((string)($user['email'] ?? '')),
+            'role' => trim((string)($user['role'] ?? '')),
+            'department' => trim((string)($user['department'] ?? '')),
+            'status' => trim((string)($user['status'] ?? 'Ativo')),
+            'password' => trim((string)($user['password'] ?? '')),
+        ];
+    }
+
+    private function getUsers(): array
+    {
+        $path = $this->usersStoragePath();
+
+        if (!is_file($path)) {
+            $users = isset($_SESSION['users']) && is_array($_SESSION['users'])
+                ? $_SESSION['users']
+                : $this->defaultUsers();
+            $this->saveUsers($users);
+
+            return $_SESSION['users'] ?? array_values($users);
+        }
+
+        $raw = file_get_contents($path);
+        if ($raw === false || trim($raw) === '') {
+            $_SESSION['users'] = [];
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            $users = $this->defaultUsers();
+            $_SESSION['users'] = $users;
+            return $users;
+        }
+
+        $users = [];
+        foreach ($decoded as $user) {
+            if (!is_array($user)) {
+                continue;
+            }
+
+            $normalized = $this->normalizeUser($user, count($users) + 1);
+            if ($normalized['id'] <= 0 || $normalized['name'] === '') {
+                continue;
+            }
+
+            $users[] = $normalized;
+        }
+
         $_SESSION['users'] = array_values($users);
+        return array_values($users);
+    }
+
+    private function saveUsers(array $users): bool
+    {
+        $path = $this->usersStoragePath();
+        $dir = dirname($path);
+
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return false;
+        }
+
+        $normalized = [];
+        foreach ($users as $user) {
+            if (!is_array($user)) {
+                continue;
+            }
+
+            $normalized[] = $this->normalizeUser($user, count($normalized) + 1);
+        }
+
+        $payload = json_encode(array_values($normalized), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($payload === false) {
+            return false;
+        }
+
+        if (file_put_contents($path, $payload, LOCK_EX) === false) {
+            return false;
+        }
+
+        $_SESSION['users'] = array_values($normalized);
+        return true;
     }
 
     public function index(): void
@@ -314,8 +393,11 @@ class DashboardController extends Controller
             'password' => trim($_POST['password'] ?? ''),
         ];
 
-        $this->saveUsers($users);
-        $_SESSION['success'] = 'Utilizador criado com sucesso.';
+        if ($this->saveUsers($users)) {
+            $_SESSION['success'] = 'Utilizador criado com sucesso.';
+        } else {
+            $_SESSION['error'] = 'Não foi possível guardar o utilizador. Verifique permissões da pasta storage.';
+        }
         $this->redirect('/admin/users');
     }
 
@@ -361,8 +443,11 @@ class DashboardController extends Controller
         }
         unset($u);
 
-        $this->saveUsers($users);
-        $_SESSION['success'] = 'Utilizador atualizado com sucesso.';
+        if ($this->saveUsers($users)) {
+            $_SESSION['success'] = 'Utilizador atualizado com sucesso.';
+        } else {
+            $_SESSION['error'] = 'Não foi possível atualizar o utilizador. Verifique permissões da pasta storage.';
+        }
         $this->redirect('/admin/users');
     }
 
@@ -370,9 +455,12 @@ class DashboardController extends Controller
     {
         Middleware::auth();
         $id = (int)($_POST['id'] ?? 0);
-        $users = array_filter($this->getUsers(), fn ($u) => (int)$u['id'] !== $id);
-        $this->saveUsers($users);
-        $_SESSION['success'] = 'Utilizador eliminado com sucesso.';
+        $users = array_values(array_filter($this->getUsers(), fn ($u) => (int)$u['id'] !== $id));
+        if ($this->saveUsers($users)) {
+            $_SESSION['success'] = 'Utilizador eliminado com sucesso.';
+        } else {
+            $_SESSION['error'] = 'Não foi possível eliminar o utilizador. Verifique permissões da pasta storage.';
+        }
         $this->redirect('/admin/users');
     }
 
@@ -808,7 +896,7 @@ class DashboardController extends Controller
     {
         Middleware::auth();
         $contents = $this->loadContents();
-        $users = $_SESSION['users'] ?? $this->defaultUsers();
+        $users = $this->getUsers();
         $options = $this->collectContentOptions($contents, $users);
 
         $this->view('admin/contents/index', [
@@ -918,7 +1006,7 @@ class DashboardController extends Controller
         Middleware::auth();
         $id = (int)($_GET['id'] ?? 0);
         $contents = $this->loadContents();
-        $users = $_SESSION['users'] ?? $this->defaultUsers();
+        $users = $this->getUsers();
         $options = $this->collectContentOptions($contents, $users);
         $content = $this->findContentById($id);
 
