@@ -1,0 +1,29 @@
+[
+    {
+        "id": 1,
+        "name": "Ana Martins",
+        "email": "ana@empresa.pt",
+        "role": "Formadora",
+        "department": "Produção",
+        "status": "Ativo",
+        "password": "Ana@1234"
+    },
+    {
+        "id": 2,
+        "name": "Carlos Silva",
+        "email": "carlos@empresa.pt",
+        "role": "Operador",
+        "department": "Qualidade",
+        "status": "Ativo",
+        "password": "Carlos@1234"
+    },
+    {
+        "id": 3,
+        "name": "Rita Costa",
+        "email": "rita@empresa.pt",
+        "role": "Gestora RH",
+        "department": "RH",
+        "status": "Pendente",
+        "password": "Rita@1234"
+    }
+]
