@@ -7,17 +7,49 @@
             $videoUrl = (string)$content['video_url'];
             $playerUrl = (string)($mediaUrl ?? $videoUrl);
             $videoDownloadUrl = (string)($downloadUrl ?? $videoUrl);
+            $videoMimeType = media_mime_type($videoUrl) ?: 'video/mp4';
         ?>
-        <div class="ratio ratio-16x9 bg-dark rounded overflow-hidden shadow-sm">
-            <video class="w-100 h-100" controls playsinline preload="metadata" controlsList="nodownload">
-                <source src="<?= e($playerUrl) ?>" type="<?= e(media_mime_type($videoUrl)) ?>">
-                O seu browser não consegue reproduzir este vídeo. Descarregue o ficheiro para o visualizar.
+        <link href="https://cdn.jsdelivr.net/npm/video.js@8.21.1/dist/video-js.min.css" rel="stylesheet">
+        <div class="video-player-shell rounded overflow-hidden shadow-sm bg-dark">
+            <video
+                id="content-video-player"
+                class="video-js vjs-big-play-centered vjs-fluid"
+                controls
+                playsinline
+                preload="auto"
+                data-setup='{"fluid":true,"responsive":true,"playbackRates":[0.5,1,1.25,1.5,2]}'
+            >
+                <source src="<?= e($playerUrl) ?>" type="<?= e($videoMimeType) ?>">
+                <p class="vjs-no-js">Ative JavaScript para usar o player ou descarregue o vídeo.</p>
             </video>
+        </div>
+        <div id="video-player-error" class="alert alert-warning d-none mt-3 mb-0" role="alert">
+            Não foi possível carregar o vídeo no player. Use o botão de download abaixo e confirme que o ficheiro é MP4 H.264/AAC ou WebM VP8/VP9/Opus.
         </div>
         <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
             <a href="<?= e($videoDownloadUrl) ?>" class="btn btn-outline-secondary btn-sm">Descarregar vídeo</a>
-            <small class="text-muted">O vídeo é servido pelo endpoint da aplicação com suporte de streaming/range para MP4 e WebM.</small>
+            <a href="<?= e($playerUrl) ?>" target="_blank" rel="noopener" class="btn btn-outline-dark btn-sm">Abrir vídeo em nova aba</a>
+            <small class="text-muted">Player Video.js com endpoint de streaming autenticado e suporte a Range/HEAD para MP4 e WebM.</small>
         </div>
+        <script src="https://cdn.jsdelivr.net/npm/video.js@8.21.1/dist/video.min.js"></script>
+        <script>
+            (function () {
+                var errorBox = document.getElementById('video-player-error');
+                if (typeof videojs === 'undefined') {
+                    if (errorBox) {
+                        errorBox.classList.remove('d-none');
+                    }
+                    return;
+                }
+
+                var player = videojs('content-video-player');
+                player.on('error', function () {
+                    if (errorBox) {
+                        errorBox.classList.remove('d-none');
+                    }
+                });
+            })();
+        </script>
     <?php elseif (($content['type'] ?? '') === 'PDF' && !empty($content['video_url'])): ?>
         <?php
             $pdfUrl = (string)($mediaUrl ?? $content['video_url']);

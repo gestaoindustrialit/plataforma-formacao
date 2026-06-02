@@ -1101,6 +1101,10 @@ class DashboardController extends Controller
             header('Content-Range: bytes ' . $start . '-' . $end . '/' . $fileSize);
         }
 
+        if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'HEAD') {
+            exit;
+        }
+
         $handle = fopen($filePath, 'rb');
         if ($handle === false) {
             http_response_code(404);
