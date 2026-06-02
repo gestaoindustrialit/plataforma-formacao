@@ -453,6 +453,32 @@ class DashboardController extends Controller
         ];
     }
 
+    private function userSelectSql(): string
+    {
+        return 'SELECT u.id, u.name, u.email, u.status, r.name AS role, COALESCE(d.name, "") AS department FROM users u JOIN roles r ON r.id = u.role_id LEFT JOIN departments d ON d.id = u.department_id';
+    }
+
+    private function findUserById(int $id): ?array
+    {
+        $this->ensureUserRows();
+        $row = $this->db()->fetch($this->userSelectSql() . ' WHERE u.id = :id LIMIT 1', ['id' => $id]);
+
+        return $row ? $this->rowToUser($row) : null;
+    }
+
+    private function findUserByEmail(string $email): ?array
+    {
+        $email = trim($email);
+        if ($email === '') {
+            return null;
+        }
+
+        $this->ensureUserRows();
+        $row = $this->db()->fetch($this->userSelectSql() . ' WHERE u.email = :email LIMIT 1', ['email' => $email]);
+
+        return $row ? $this->rowToUser($row) : null;
+    }
+
     private function ensureUserRows(): void
     {
         $count = (int)$this->db()->fetch('SELECT COUNT(*) AS total FROM users')['total'];
@@ -466,7 +492,7 @@ class DashboardController extends Controller
     private function getUsers(): array
     {
         $this->ensureUserRows();
-        $rows = $this->db()->fetchAll('SELECT u.id, u.name, u.email, u.status, r.name AS role, COALESCE(d.name, "") AS department FROM users u JOIN roles r ON r.id = u.role_id LEFT JOIN departments d ON d.id = u.department_id ORDER BY u.id');
+        $rows = $this->db()->fetchAll($this->userSelectSql() . ' ORDER BY u.id');
 
         return array_map(fn ($row) => $this->rowToUser($row), $rows);
     }
@@ -497,7 +523,15 @@ class DashboardController extends Controller
     private function updateUserRecord(int $id, array $user, string $newPassword): bool
     {
         try {
+            if ($id <= 0 || $this->findUserById($id) === null) {
+                return false;
+            }
+
             $item = $this->normalizeUser($user, $id);
+            if ($item['name'] === '' || $item['email'] === '' || $item['role'] === '') {
+                return false;
+            }
+
             $data = [
                 'name' => $item['name'],
                 'email' => $item['email'],
@@ -670,13 +704,11 @@ class DashboardController extends Controller
     {
         Middleware::auth();
         $id = (int)($_GET['id'] ?? 0);
-        $user = null;
+        $expectedEmail = trim($_GET['email'] ?? '');
+        $user = $this->findUserById($id);
 
-        foreach ($this->getUsers() as $candidate) {
-            if ((int)$candidate['id'] === $id) {
-                $user = $candidate;
-                break;
-            }
+        if ($expectedEmail !== '' && (!$user || strcasecmp($user['email'], $expectedEmail) !== 0)) {
+            $user = $this->findUserByEmail($expectedEmail);
         }
 
         if (!$user) {
