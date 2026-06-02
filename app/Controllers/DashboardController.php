@@ -574,10 +574,54 @@ class DashboardController extends Controller
         }
     }
 
+    private function tableExists(string $table): bool
+    {
+        $row = $this->db()->fetch(
+            'SELECT name FROM sqlite_master WHERE type = "table" AND name = :table LIMIT 1',
+            ['table' => $table]
+        );
+
+        return $row !== false;
+    }
+
+    private function countRows(string $sql, array $params = []): int
+    {
+        $row = $this->db()->fetch($sql, $params);
+
+        return (int)($row['total'] ?? 0);
+    }
+
+    private function dashboardMetrics(): array
+    {
+        $activeUsers = $this->countRows('SELECT COUNT(*) AS total FROM users WHERE status IN ("active", "Ativo")');
+        $publishedContents = $this->countRows('SELECT COUNT(*) AS total FROM training_contents');
+
+        $completionRate = 0;
+        $pendingTrainings = 0;
+        if ($this->tableExists('video_progress')) {
+            $totalProgressRecords = $this->countRows('SELECT COUNT(*) AS total FROM video_progress');
+            if ($totalProgressRecords > 0) {
+                $completedProgressRecords = $this->countRows('SELECT COUNT(*) AS total FROM video_progress WHERE completed = 1 OR progress_percent >= 100');
+                $completionRate = (int)round(($completedProgressRecords / $totalProgressRecords) * 100);
+                $pendingTrainings = max(0, $totalProgressRecords - $completedProgressRecords);
+            }
+        }
+
+        return [
+            'activeUsers' => $activeUsers,
+            'publishedContents' => $publishedContents,
+            'completionRate' => $completionRate,
+            'pendingTrainings' => $pendingTrainings,
+        ];
+    }
+
     public function index(): void
     {
         Middleware::auth();
-        $this->view('dashboard/index', ['title' => 'Centro de Formação']);
+        $this->view('dashboard/index', [
+            'title' => 'Centro de Formação',
+            'dashboardMetrics' => $this->dashboardMetrics(),
+        ]);
     }
 
 
