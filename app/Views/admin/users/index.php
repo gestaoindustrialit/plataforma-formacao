@@ -11,7 +11,7 @@
                 <tr>
                     <td><?= e($u['name']) ?></td><td><?= e($u['email']) ?></td><td><?= e($u['role']) ?></td><td><?= e($u['department']) ?></td><td><?= e($u['status']) ?></td>
                     <td class="text-end">
-                        <a class="btn btn-sm btn-outline-secondary" href="<?= url('/admin/users/edit?id=' . (int)$u['id']) ?>" title="Editar">
+                        <a class="btn btn-sm btn-outline-secondary" href="<?= e(url('/admin/users/edit?email=' . rawurlencode((string)$u['email']))) ?>" title="Editar <?= e($u['name']) ?>">
                             <i class="bi bi-pencil-square"></i>
                         </a>
                         <form method="post" action="<?= url('/admin/users/delete') ?>" class="d-inline">
