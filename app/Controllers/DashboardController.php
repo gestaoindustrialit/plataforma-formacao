@@ -1026,6 +1026,73 @@ class DashboardController extends Controller
         return null;
     }
 
+    private function isSuperAdminUser(): bool
+    {
+        return (int)($_SESSION['user']['is_admin'] ?? 0) === 1;
+    }
+
+    private function currentUserContentClaims(): array
+    {
+        $user = $_SESSION['user'] ?? [];
+        $claims = [
+            trim((string)($user['name'] ?? '')),
+            trim((string)($user['username'] ?? '')),
+            trim((string)($user['email'] ?? '')),
+        ];
+
+        $departmentId = (int)($user['department_id'] ?? 0);
+        if ($departmentId > 0) {
+            $department = $this->db()->fetch('SELECT name FROM departments WHERE id = :id LIMIT 1', ['id' => $departmentId]);
+            if ($department) {
+                $claims[] = trim((string)($department['name'] ?? ''));
+            }
+        }
+
+        $roleId = (int)($user['role_id'] ?? 0);
+        if ($roleId > 0) {
+            $role = $this->db()->fetch('SELECT name FROM roles WHERE id = :id LIMIT 1', ['id' => $roleId]);
+            if ($role) {
+                $claims[] = trim((string)($role['name'] ?? ''));
+            }
+        }
+
+        return array_values(array_unique(array_filter($claims, fn ($claim) => $claim !== '')));
+    }
+
+    private function contentIsVisibleForCurrentUser(array $content): bool
+    {
+        if ($this->isSuperAdminUser()) {
+            return true;
+        }
+
+        $visibleFor = trim((string)($content['visible_for'] ?? ''));
+        if ($visibleFor === '') {
+            return true;
+        }
+
+        $normalizedVisibleFor = strtolower($visibleFor);
+        if (in_array($normalizedVisibleFor, ['todos', 'global'], true)) {
+            return true;
+        }
+
+        foreach ($this->currentUserContentClaims() as $claim) {
+            if (strtolower($claim) === $normalizedVisibleFor) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function visibleContentsForCurrentUser(array $contents): array
+    {
+        if ($this->isSuperAdminUser()) {
+            return array_values($contents);
+        }
+
+        return array_values(array_filter($contents, fn ($content) => $this->contentIsVisibleForCurrentUser($content)));
+    }
+
     private function pushViewHistory(array $content): void
     {
         $history = $_SESSION['content_history'] ?? [];
@@ -1294,9 +1361,13 @@ class DashboardController extends Controller
     public function listContents(): void
     {
         Middleware::auth();
-        $contents = $this->loadContents();
+        $contents = $this->visibleContentsForCurrentUser($this->loadContents());
 
-        $this->view('contents/index', ['title' => 'Conteúdos Disponíveis', 'contents' => $contents]);
+        $this->view('contents/index', [
+            'title' => 'Conteúdos Disponíveis',
+            'contents' => $contents,
+            'contentTrainingTree' => $this->buildContentTrainingTree($contents),
+        ]);
     }
 
     public function showContent(): void
@@ -1305,7 +1376,7 @@ class DashboardController extends Controller
         $id = (int)($_GET['id'] ?? 0);
         $content = $this->findContentById($id);
 
-        if (!$content) {
+        if (!$content || !$this->contentIsVisibleForCurrentUser($content)) {
             $_SESSION['error'] = 'Conteúdo não encontrado.';
             $this->redirect('/contents');
         }
