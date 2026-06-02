@@ -988,6 +988,137 @@ class DashboardController extends Controller
         return url($publicDir . $fileName);
     }
 
+
+    private function localContentFilePath(string $contentUrl): string
+    {
+        $path = parse_url($contentUrl, PHP_URL_PATH);
+        if (!is_string($path) || $path === '') {
+            $path = $contentUrl;
+        }
+
+        $path = rawurldecode($path);
+        $uploadsPosition = strpos($path, '/uploads/');
+        if ($uploadsPosition === false) {
+            $uploadsPosition = strpos($path, '/public/uploads/');
+            if ($uploadsPosition !== false) {
+                $path = substr($path, $uploadsPosition + strlen('/public'));
+                $uploadsPosition = 0;
+            }
+        }
+
+        if ($uploadsPosition === false) {
+            return '';
+        }
+
+        $relativePath = substr($path, $uploadsPosition);
+        if (!preg_match('#^/uploads/(videos|pdfs)/[^/]+$#', $relativePath)) {
+            return '';
+        }
+
+        $appRoot = dirname(__DIR__, 2);
+        $fullPath = realpath($appRoot . '/public' . $relativePath);
+        $uploadsRoot = realpath($appRoot . '/public/uploads');
+
+        if ($fullPath === false || $uploadsRoot === false || strpos($fullPath, $uploadsRoot . DIRECTORY_SEPARATOR) !== 0 || !is_file($fullPath)) {
+            return '';
+        }
+
+        return $fullPath;
+    }
+
+    private function contentMediaUrl(array $content): string
+    {
+        return url('/contents/media?id=' . (int)($content['id'] ?? 0));
+    }
+
+    private function contentDownloadUrl(array $content): string
+    {
+        return url('/contents/download?id=' . (int)($content['id'] ?? 0));
+    }
+
+    private function streamLocalContentFile(array $content, bool $download): void
+    {
+        $contentUrl = (string)($content['video_url'] ?? '');
+        $filePath = $this->localContentFilePath($contentUrl);
+        if ($filePath === '') {
+            if ($contentUrl !== '') {
+                header('Location: ' . $contentUrl);
+                exit;
+            }
+
+            http_response_code(404);
+            echo 'Ficheiro não encontrado.';
+            return;
+        }
+
+        $fileSize = filesize($filePath);
+        if ($fileSize === false) {
+            http_response_code(404);
+            echo 'Ficheiro não encontrado.';
+            return;
+        }
+
+        $mimeType = media_mime_type($filePath) ?: 'application/octet-stream';
+        $fileName = basename($filePath);
+        $start = 0;
+        $end = $fileSize - 1;
+        $statusCode = 200;
+
+        $range = $_SERVER['HTTP_RANGE'] ?? '';
+        if (!$download && is_string($range) && preg_match('/bytes=(\d*)-(\d*)/', $range, $matches)) {
+            if ($matches[1] !== '') {
+                $start = (int)$matches[1];
+            }
+            if ($matches[2] !== '') {
+                $end = (int)$matches[2];
+            }
+            if ($matches[1] === '' && $matches[2] !== '') {
+                $suffixLength = (int)$matches[2];
+                $start = max(0, $fileSize - $suffixLength);
+                $end = $fileSize - 1;
+            }
+
+            if ($start > $end || $start >= $fileSize) {
+                header('Content-Range: bytes */' . $fileSize);
+                http_response_code(416);
+                return;
+            }
+
+            $end = min($end, $fileSize - 1);
+            $statusCode = 206;
+        }
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        http_response_code($statusCode);
+        header('Content-Type: ' . $mimeType);
+        header('Accept-Ranges: bytes');
+        header('Content-Disposition: ' . ($download ? 'attachment' : 'inline') . '; filename="' . str_replace('"', '', $fileName) . '"');
+        header('Content-Length: ' . (($end - $start) + 1));
+        if ($statusCode === 206) {
+            header('Content-Range: bytes ' . $start . '-' . $end . '/' . $fileSize);
+        }
+
+        $handle = fopen($filePath, 'rb');
+        if ($handle === false) {
+            http_response_code(404);
+            return;
+        }
+
+        fseek($handle, $start);
+        $remaining = ($end - $start) + 1;
+        while ($remaining > 0 && !feof($handle)) {
+            $chunkSize = min(8192, $remaining);
+            echo fread($handle, $chunkSize);
+            flush();
+            $remaining -= $chunkSize;
+        }
+        fclose($handle);
+        exit;
+    }
+
     private function parseSizeToBytes(string $value): int
     {
         $trimmed = trim($value);
@@ -1382,7 +1513,40 @@ class DashboardController extends Controller
         }
 
         $this->pushViewHistory($content);
-        $this->view('contents/show', ['title' => $content['title'] ?? 'Conteúdo', 'content' => $content]);
+        $this->view('contents/show', [
+            'title' => $content['title'] ?? 'Conteúdo',
+            'content' => $content,
+            'mediaUrl' => $this->contentMediaUrl($content),
+            'downloadUrl' => $this->contentDownloadUrl($content),
+        ]);
+    }
+
+    public function streamContentMedia(): void
+    {
+        Middleware::auth();
+        $content = $this->findContentById((int)($_GET['id'] ?? 0));
+
+        if (!$content || !$this->contentIsVisibleForCurrentUser($content)) {
+            http_response_code(404);
+            echo 'Conteúdo não encontrado.';
+            return;
+        }
+
+        $this->streamLocalContentFile($content, false);
+    }
+
+    public function downloadContent(): void
+    {
+        Middleware::auth();
+        $content = $this->findContentById((int)($_GET['id'] ?? 0));
+
+        if (!$content || !$this->contentIsVisibleForCurrentUser($content)) {
+            http_response_code(404);
+            echo 'Conteúdo não encontrado.';
+            return;
+        }
+
+        $this->streamLocalContentFile($content, true);
     }
 
     public function knowledge(): void
