@@ -1,7 +1,7 @@
 <?php
 use App\Core\Auth;
 
-$user = Auth::user();
+$authUser = Auth::user();
 $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 
 $mainLinks = [
@@ -32,10 +32,10 @@ $mainLinks = [
                 <?php endforeach; ?>
             </ul>
 
-            <?php if ($user): ?>
+            <?php if ($authUser): ?>
                 <div class="d-flex align-items-lg-center gap-2 flex-column flex-lg-row">
                     <a class="btn btn-outline-light btn-sm" href="<?= e(url('/profile')) ?>">Perfil</a>
-                    <span class="text-white-50 small d-none d-lg-inline"><?= e($user['name'] ?? $user['username'] ?? 'Utilizador') ?></span>
+                    <span class="text-white-50 small d-none d-lg-inline"><?= e($authUser['name'] ?? $authUser['username'] ?? 'Utilizador') ?></span>
                     <a class="btn btn-light btn-sm" href="<?= e(url('/logout')) ?>">Logout</a>
                 </div>
             <?php endif; ?>
