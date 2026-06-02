@@ -703,13 +703,10 @@ class DashboardController extends Controller
     public function editUserForm(): void
     {
         Middleware::auth();
+        $email = trim($_GET['email'] ?? '');
         $id = (int)($_GET['id'] ?? 0);
-        $expectedEmail = trim($_GET['email'] ?? '');
-        $user = $this->findUserById($id);
 
-        if ($expectedEmail !== '' && (!$user || strcasecmp($user['email'], $expectedEmail) !== 0)) {
-            $user = $this->findUserByEmail($expectedEmail);
-        }
+        $user = $email !== '' ? $this->findUserByEmail($email) : $this->findUserById($id);
 
         if (!$user) {
             $_SESSION['error'] = 'Utilizador não encontrado.';
