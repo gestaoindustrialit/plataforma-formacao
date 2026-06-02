@@ -29,7 +29,9 @@ class AuthController extends Controller
         $userModel = new User($db);
         $user = $userModel->findByLogin(trim($_POST['login'] ?? ''));
 
-        if (!$user || !password_verify($_POST['password'] ?? '', $user['password'])) {
+        $password = $_POST['password'] ?? '';
+
+        if (!$user || !$this->passwordMatches($password, (string)($user['password'] ?? ''), $userModel, (int)($user['id'] ?? 0))) {
             $_SESSION['error'] = 'Credenciais inválidas.';
             $this->redirect('/login');
         }
@@ -37,6 +39,28 @@ class AuthController extends Controller
         unset($user['password']);
         Auth::login($user);
         $this->redirect('/dashboard');
+    }
+
+    private function passwordMatches(string $password, string $storedPassword, User $userModel, int $userId): bool
+    {
+        if ($storedPassword === '') {
+            return false;
+        }
+
+        if (password_verify($password, $storedPassword)) {
+            if (password_needs_rehash($storedPassword, PASSWORD_DEFAULT)) {
+                $userModel->updatePasswordHash($userId, password_hash($password, PASSWORD_DEFAULT));
+            }
+
+            return true;
+        }
+
+        if (password_get_info($storedPassword)['algoName'] === 'unknown' && hash_equals($storedPassword, $password)) {
+            $userModel->updatePasswordHash($userId, password_hash($password, PASSWORD_DEFAULT));
+            return true;
+        }
+
+        return false;
     }
 
     public function logout(): void
