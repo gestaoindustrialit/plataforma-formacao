@@ -8,6 +8,7 @@ class Router
     private $routes = [];
 
     public function get(string $path, $handler): void { $this->add('GET', $path, $handler); }
+    public function head(string $path, $handler): void { $this->add('HEAD', $path, $handler); }
     public function post(string $path, $handler): void { $this->add('POST', $path, $handler); }
 
     private function add(string $method, string $path, $handler): void
