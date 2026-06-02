@@ -2,20 +2,24 @@
 use App\Core\Auth;
 
 $authUser = Auth::user();
+$isAdmin = Auth::isAdmin();
 $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+$brandPath = $isAdmin ? '/dashboard' : '/contents';
 
-$mainLinks = [
+$mainLinks = $isAdmin ? [
     ['label' => 'Dashboard', 'path' => '/dashboard'],
     ['label' => 'Utilizadores', 'path' => '/admin/users'],
     ['label' => 'Permissões', 'path' => '/admin/permissions'],
     ['label' => 'Conteúdos', 'path' => '/admin/contents'],
     ['label' => 'Ver Conteúdos', 'path' => '/contents'],
     ['label' => 'Know-how', 'path' => '/admin/knowledge'],
+] : [
+    ['label' => 'Ver Conteúdos', 'path' => '/contents'],
 ];
 ?>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container">
-        <a class="navbar-brand fw-semibold" href="<?= e(url('/dashboard')) ?>">Centro de Formação Operacional</a>
+        <a class="navbar-brand fw-semibold" href="<?= e(url($brandPath)) ?>">Centro de Formação Operacional</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Alternar navegação">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -34,7 +38,9 @@ $mainLinks = [
 
             <?php if ($authUser): ?>
                 <div class="d-flex align-items-lg-center gap-2 flex-column flex-lg-row">
-                    <a class="btn btn-outline-light btn-sm" href="<?= e(url('/profile')) ?>">Perfil</a>
+                    <?php if ($isAdmin): ?>
+                        <a class="btn btn-outline-light btn-sm" href="<?= e(url('/profile')) ?>">Perfil</a>
+                    <?php endif; ?>
                     <span class="text-white-50 small d-none d-lg-inline"><?= e($authUser['name'] ?? $authUser['username'] ?? 'Utilizador') ?></span>
                     <a class="btn btn-light btn-sm" href="<?= e(url('/logout')) ?>">Logout</a>
                 </div>

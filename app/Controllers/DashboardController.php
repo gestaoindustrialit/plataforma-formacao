@@ -437,7 +437,7 @@ class DashboardController extends Controller
         }
 
         $info = password_get_info($password);
-        return $info['algo'] !== 0 ? $password : password_hash($password, PASSWORD_DEFAULT);
+        return $info['algoName'] !== 'unknown' ? $password : password_hash($password, PASSWORD_DEFAULT);
     }
 
     private function rowToUser(array $row): array
@@ -651,7 +651,7 @@ class DashboardController extends Controller
 
     public function index(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $this->view('dashboard/index', [
             'title' => 'Centro de Formação',
             'dashboardMetrics' => $this->dashboardMetrics(),
@@ -668,7 +668,7 @@ class DashboardController extends Controller
 
     public function users(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $users = $this->getUsers();
 
         $this->view('admin/users/index', ['title' => 'Utilizadores', 'users' => $users]);
@@ -676,13 +676,13 @@ class DashboardController extends Controller
 
     public function createUserForm(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $this->view('admin/users/create', ['title' => 'Novo Utilizador']);
     }
 
     public function storeUser(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $user = [
             'name' => trim($_POST['name'] ?? ''),
             'email' => trim($_POST['email'] ?? ''),
@@ -702,7 +702,7 @@ class DashboardController extends Controller
 
     public function editUserForm(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $email = trim($_GET['email'] ?? '');
         $id = (int)($_GET['id'] ?? 0);
 
@@ -718,7 +718,7 @@ class DashboardController extends Controller
 
     public function updateUser(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $id = (int)($_POST['id'] ?? 0);
         $user = [
             'id' => $id,
@@ -740,7 +740,7 @@ class DashboardController extends Controller
 
     public function deleteUser(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $id = (int)($_POST['id'] ?? 0);
         if ($this->deleteUserById($id)) {
             $_SESSION['success'] = 'Utilizador eliminado com sucesso.';
@@ -752,7 +752,7 @@ class DashboardController extends Controller
 
     public function permissions(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $users = $this->getUsers();
 
         if (!isset($_SESSION['permission_profiles'])) {
@@ -811,7 +811,7 @@ class DashboardController extends Controller
 
     public function savePermissions(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $users = $this->getUsers();
         $selectedUser = trim($_POST['user'] ?? '');
         $selectedProfile = trim($_POST['profile'] ?? '');
@@ -1378,7 +1378,7 @@ class DashboardController extends Controller
 
     public function contents(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $contents = $this->loadContents();
         $users = $this->getUsers();
         $options = $this->collectContentOptions($contents, $users);
@@ -1399,7 +1399,7 @@ class DashboardController extends Controller
 
     public function storeContent(): void
     {
-        Middleware::auth();
+        Middleware::admin();
 
         $contentLength = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
         if ($contentLength > 0 && empty($_POST) && empty($_FILES)) {
@@ -1458,7 +1458,7 @@ class DashboardController extends Controller
 
     public function deleteContent(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $id = (int)($_POST['id'] ?? 0);
         $contents = $this->loadContents();
         $contentToDelete = null;
@@ -1483,7 +1483,7 @@ class DashboardController extends Controller
 
     public function editContent(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $id = (int)($_GET['id'] ?? 0);
         $contents = $this->loadContents();
         $users = $this->getUsers();
@@ -1513,7 +1513,7 @@ class DashboardController extends Controller
 
     public function updateContent(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $id = (int)($_POST['id'] ?? 0);
         $contents = $this->loadContents();
         $uploadedFileUrl = $this->handleContentUpload(trim($_POST['type'] ?? 'Vídeo'));
@@ -1628,7 +1628,7 @@ class DashboardController extends Controller
 
     public function knowledge(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $nodes = $this->loadKnowledgeNodes();
         $this->view('admin/knowledge/index', [
             'title' => 'Departamentos e Pastas de Conhecimento',
@@ -1639,7 +1639,7 @@ class DashboardController extends Controller
 
     public function storeKnowledgeNode(): void
     {
-        Middleware::auth();
+        Middleware::admin();
         $path = trim($_POST['path'] ?? '');
 
         if ($path !== '') {
