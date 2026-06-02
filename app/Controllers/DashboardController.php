@@ -437,7 +437,7 @@ class DashboardController extends Controller
         }
 
         $info = password_get_info($password);
-        return $info['algo'] !== 0 ? $password : password_hash($password, PASSWORD_DEFAULT);
+        return $info['algoName'] !== 'unknown' ? $password : password_hash($password, PASSWORD_DEFAULT);
     }
 
     private function rowToUser(array $row): array
