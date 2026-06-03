@@ -8,6 +8,43 @@ class User extends Model
     /** @return array|false */
     public function findByLogin(string $login)
     {
-        return $this->db->fetch('SELECT u.*, r.is_admin FROM users u JOIN roles r ON r.id = u.role_id WHERE (u.email = :login OR u.username = :login) AND u.status = "active" LIMIT 1', ['login' => $login]);
+        $login = trim($login);
+
+        if ($login === '') {
+            return false;
+        }
+
+        return $this->db->fetch(
+            'SELECT u.*, COALESCE(r.is_admin, 0) AS is_admin
+             FROM users u
+             LEFT JOIN roles r ON r.id = u.role_id
+             WHERE (LOWER(TRIM(u.email)) = LOWER(:login) OR LOWER(TRIM(u.username)) = LOWER(:login))
+               AND LOWER(TRIM(u.status)) IN ("active", "ativo")
+             LIMIT 1',
+            ['login' => $login]
+        );
+    }
+
+    public function updatePasswordHash(int $id, string $passwordHash): bool
+    {
+        try {
+            return $this->db->update(
+                'users',
+                ['password' => $passwordHash, 'updated_at' => date('Y-m-d H:i:s')],
+                'id = :id',
+                ['id' => $id]
+            ) > 0;
+        } catch (\Throwable $exception) {
+            try {
+                return $this->db->update(
+                    'users',
+                    ['password' => $passwordHash],
+                    'id = :id',
+                    ['id' => $id]
+                ) > 0;
+            } catch (\Throwable $fallbackException) {
+                return false;
+            }
+        }
     }
 }
