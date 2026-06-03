@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Core\Controller;
 use App\Core\Database;
+use App\Core\Auth;
 use App\Core\Middleware;
 
 class DashboardController extends Controller
@@ -1244,7 +1245,7 @@ class DashboardController extends Controller
 
     private function isSuperAdminUser(): bool
     {
-        return (int)($_SESSION['user']['is_admin'] ?? 0) === 1;
+        return Auth::isAdmin();
     }
 
     private function currentUserContentClaims(): array
@@ -1254,6 +1255,9 @@ class DashboardController extends Controller
             trim((string)($user['name'] ?? '')),
             trim((string)($user['username'] ?? '')),
             trim((string)($user['email'] ?? '')),
+            trim((string)($user['role'] ?? '')),
+            trim((string)($user['role_name'] ?? '')),
+            trim((string)($user['department'] ?? '')),
         ];
 
         $departmentId = (int)($user['department_id'] ?? 0);
@@ -1286,18 +1290,27 @@ class DashboardController extends Controller
             return true;
         }
 
-        $normalizedVisibleFor = strtolower($visibleFor);
-        if (in_array($normalizedVisibleFor, ['todos', 'global'], true)) {
+        $visibleTargets = $this->splitContentAudience($visibleFor);
+        $normalizedVisibleTargets = array_map(fn ($target) => strtolower($target), $visibleTargets);
+        if (array_intersect($normalizedVisibleTargets, ['todos', 'global'])) {
             return true;
         }
 
-        foreach ($this->currentUserContentClaims() as $claim) {
-            if (strtolower($claim) === $normalizedVisibleFor) {
+        $claims = array_map(fn ($claim) => strtolower($claim), $this->currentUserContentClaims());
+        foreach ($normalizedVisibleTargets as $target) {
+            if (in_array($target, $claims, true)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private function splitContentAudience(string $audience): array
+    {
+        $parts = preg_split('/[,;|]+/', $audience) ?: [];
+
+        return array_values(array_filter(array_map('trim', $parts), fn ($part) => $part !== ''));
     }
 
     private function visibleContentsForCurrentUser(array $contents): array
