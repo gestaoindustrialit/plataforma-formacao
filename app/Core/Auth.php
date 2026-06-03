@@ -13,6 +13,11 @@ class Auth
         return self::user() !== null;
     }
 
+    public static function isAdmin(): bool
+    {
+        return (int)(self::user()['is_admin'] ?? 0) === 1;
+    }
+
     public static function login(array $user): void
     {
         session_regenerate_id(true);
