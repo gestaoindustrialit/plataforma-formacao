@@ -5,6 +5,7 @@ use App\Core\Controller;
 use App\Core\Database;
 use App\Core\Auth;
 use App\Core\Middleware;
+use App\Core\Csrf;
 
 class DashboardController extends Controller
 {
@@ -1592,10 +1593,19 @@ class DashboardController extends Controller
         Middleware::auth();
         $contents = $this->visibleContentsForCurrentUser($this->loadContents());
 
+        $contentHistory = $_SESSION['content_history'] ?? [];
+        $viewedContentIds = array_values(array_unique(array_map(
+            fn ($item) => (int)($item['id'] ?? 0),
+            is_array($contentHistory) ? $contentHistory : []
+        )));
+        $recentContentIds = array_slice($viewedContentIds, 0, 3);
+
         $this->view('contents/index', [
             'title' => 'Conteúdos Disponíveis',
             'contents' => $contents,
             'contentTrainingTree' => $this->buildContentTrainingTree($contents),
+            'viewedContentIds' => $viewedContentIds,
+            'recentContentIds' => $recentContentIds,
         ]);
     }
 
@@ -1610,13 +1620,45 @@ class DashboardController extends Controller
             $this->redirect('/contents');
         }
 
-        $this->pushViewHistory($content);
+        if (($content['type'] ?? '') === 'PDF' && !empty($content['video_url'])) {
+            $this->pushViewHistory($content);
+        }
+
         $this->view('contents/show', [
             'title' => $content['title'] ?? 'Conteúdo',
             'content' => $content,
             'mediaUrl' => $this->contentMediaUrl($content),
             'downloadUrl' => $this->contentDownloadUrl($content),
         ]);
+    }
+
+    public function completeContent(): void
+    {
+        Middleware::auth();
+
+        header('Content-Type: application/json; charset=UTF-8');
+
+        if (!Csrf::validate($_POST['_csrf'] ?? null)) {
+            http_response_code(419);
+            echo json_encode(['ok' => false, 'message' => 'Token CSRF inválido.']);
+            return;
+        }
+
+        $content = $this->findContentById((int)($_POST['id'] ?? 0));
+        if (!$content || !$this->contentIsVisibleForCurrentUser($content)) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'message' => 'Conteúdo não encontrado.']);
+            return;
+        }
+
+        if (($content['type'] ?? '') !== 'Vídeo') {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'message' => 'Apenas vídeos são concluídos por esta ação.']);
+            return;
+        }
+
+        $this->pushViewHistory($content);
+        echo json_encode(['ok' => true]);
     }
 
     public function streamContentMedia(): void

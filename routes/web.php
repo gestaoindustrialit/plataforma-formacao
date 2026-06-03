@@ -23,6 +23,7 @@ $router->post('/admin/contents/update', [DashboardController::class, 'updateCont
 $router->post('/admin/contents/delete', [DashboardController::class, 'deleteContent']);
 $router->get('/contents', [DashboardController::class, 'listContents']);
 $router->get('/contents/show', [DashboardController::class, 'showContent']);
+$router->post('/contents/complete', [DashboardController::class, 'completeContent']);
 $router->get('/contents/media', [DashboardController::class, 'streamContentMedia']);
 $router->get('/contents/download', [DashboardController::class, 'downloadContent']);
 $router->head('/contents/media', [DashboardController::class, 'streamContentMedia']);

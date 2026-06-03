@@ -26,6 +26,9 @@
         <div id="video-player-error" class="alert alert-warning d-none mt-3 mb-0" role="alert">
             Não foi possível carregar o vídeo no player. Use o botão de download abaixo e confirme que o ficheiro é MP4 H.264/AAC ou WebM VP8/VP9/Opus.
         </div>
+        <div id="video-completion-success" class="alert alert-success d-none mt-3 mb-0" role="status">
+            Vídeo concluído a 100%. Este conteúdo ficou marcado como visualizado.
+        </div>
         <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
             <a href="<?= e($videoDownloadUrl) ?>" class="btn btn-outline-secondary btn-sm">Descarregar vídeo</a>
             <a href="<?= e($playerUrl) ?>" target="_blank" rel="noopener" class="btn btn-outline-dark btn-sm">Abrir vídeo em nova aba</a>
@@ -42,7 +45,40 @@
                     return;
                 }
 
+                var completionBox = document.getElementById('video-completion-success');
+                var completionRecorded = false;
                 var player = videojs('content-video-player');
+
+                var recordCompletion = function () {
+                    if (completionRecorded) {
+                        return;
+                    }
+
+                    completionRecorded = true;
+
+                    var formData = new FormData();
+                    formData.append('id', '<?= (int)($content['id'] ?? 0) ?>');
+                    formData.append('_csrf', '<?= e(\App\Core\Csrf::token()) ?>');
+
+                    fetch('<?= e(url('/contents/complete')) ?>', {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'same-origin'
+                    }).then(function (response) {
+                        if (!response.ok) {
+                            completionRecorded = false;
+                            return;
+                        }
+
+                        if (completionBox) {
+                            completionBox.classList.remove('d-none');
+                        }
+                    }).catch(function () {
+                        completionRecorded = false;
+                    });
+                };
+
+                player.on('ended', recordCompletion);
                 player.on('error', function () {
                     if (errorBox) {
                         errorBox.classList.remove('d-none');
