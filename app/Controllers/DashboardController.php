@@ -1592,10 +1592,19 @@ class DashboardController extends Controller
         Middleware::auth();
         $contents = $this->visibleContentsForCurrentUser($this->loadContents());
 
+        $contentHistory = $_SESSION['content_history'] ?? [];
+        $viewedContentIds = array_values(array_unique(array_map(
+            fn ($item) => (int)($item['id'] ?? 0),
+            is_array($contentHistory) ? $contentHistory : []
+        )));
+        $recentContentIds = array_slice($viewedContentIds, 0, 3);
+
         $this->view('contents/index', [
             'title' => 'Conteúdos Disponíveis',
             'contents' => $contents,
             'contentTrainingTree' => $this->buildContentTrainingTree($contents),
+            'viewedContentIds' => $viewedContentIds,
+            'recentContentIds' => $recentContentIds,
         ]);
     }
 
