@@ -27,11 +27,24 @@ class User extends Model
 
     public function updatePasswordHash(int $id, string $passwordHash): bool
     {
-        return $this->db->update(
-            'users',
-            ['password' => $passwordHash, 'updated_at' => date('Y-m-d H:i:s')],
-            'id = :id',
-            ['id' => $id]
-        ) > 0;
+        try {
+            return $this->db->update(
+                'users',
+                ['password' => $passwordHash, 'updated_at' => date('Y-m-d H:i:s')],
+                'id = :id',
+                ['id' => $id]
+            ) > 0;
+        } catch (\Throwable $exception) {
+            try {
+                return $this->db->update(
+                    'users',
+                    ['password' => $passwordHash],
+                    'id = :id',
+                    ['id' => $id]
+                ) > 0;
+            } catch (\Throwable $fallbackException) {
+                return false;
+            }
+        }
     }
 }

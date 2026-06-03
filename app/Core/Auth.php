@@ -15,7 +15,9 @@ class Auth
 
     public static function isAdmin(): bool
     {
-        return (int)(self::user()['is_admin'] ?? 0) === 1;
+        $user = self::user();
+
+        return is_array($user) && (int)($user['is_admin'] ?? 0) === 1;
     }
 
     public static function login(array $user): void

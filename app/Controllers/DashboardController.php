@@ -436,8 +436,16 @@ class DashboardController extends Controller
             $password = bin2hex(random_bytes(8));
         }
 
+        return $this->passwordLooksHashed($password) ? $password : password_hash($password, PASSWORD_DEFAULT);
+    }
+
+    private function passwordLooksHashed(string $password): bool
+    {
         $info = password_get_info($password);
-        return $info['algoName'] !== 'unknown' ? $password : password_hash($password, PASSWORD_DEFAULT);
+        $algo = $info['algo'] ?? null;
+        $algoName = $info['algoName'] ?? 'unknown';
+
+        return !($algo === 0 || $algo === null) || $algoName !== 'unknown';
     }
 
     private function rowToUser(array $row): array

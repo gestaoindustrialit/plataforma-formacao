@@ -12,7 +12,7 @@ class AuthController extends Controller
     public function loginForm(): void
     {
         if (Auth::check()) {
-            $this->redirect('/dashboard');
+            $this->redirect(Auth::isAdmin() ? '/dashboard' : '/contents');
         }
 
         $this->view('auth/login', ['title' => 'Login']);
@@ -55,7 +55,7 @@ class AuthController extends Controller
             return true;
         }
 
-        if (password_get_info($storedPassword)['algoName'] === 'unknown' && hash_equals($storedPassword, $password)) {
+        if ($this->passwordLooksPlaintext($storedPassword) && hash_equals($storedPassword, $password)) {
             $userModel->updatePasswordHash($userId, password_hash($password, PASSWORD_DEFAULT));
             return true;
         }
@@ -63,26 +63,13 @@ class AuthController extends Controller
         return false;
     }
 
-    private function passwordMatches(string $password, string $storedPassword, User $userModel, int $userId): bool
+    private function passwordLooksPlaintext(string $storedPassword): bool
     {
-        if ($storedPassword === '') {
-            return false;
-        }
+        $info = password_get_info($storedPassword);
+        $algo = $info['algo'] ?? null;
+        $algoName = $info['algoName'] ?? 'unknown';
 
-        if (password_verify($password, $storedPassword)) {
-            if (password_needs_rehash($storedPassword, PASSWORD_DEFAULT)) {
-                $userModel->updatePasswordHash($userId, password_hash($password, PASSWORD_DEFAULT));
-            }
-
-            return true;
-        }
-
-        if (password_get_info($storedPassword)['algoName'] === 'unknown' && hash_equals($storedPassword, $password)) {
-            $userModel->updatePasswordHash($userId, password_hash($password, PASSWORD_DEFAULT));
-            return true;
-        }
-
-        return false;
+        return ($algo === 0 || $algo === null) && $algoName === 'unknown';
     }
 
     public function logout(): void
