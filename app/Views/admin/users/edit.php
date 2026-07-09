@@ -18,6 +18,12 @@
                     <?php endforeach; ?>
                 </select>
             </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="is_admin" name="is_admin" value="1" <?= !empty($user['is_admin']) ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="is_admin">Admin</label>
+                </div>
+            </div>
             <div class="col-12 d-flex gap-2">
                 <button type="submit" class="btn btn-dark"><i class="bi bi-check2-circle"></i> Atualizar</button>
                 <a href="<?= url('/admin/users') ?>" class="btn btn-outline-secondary">Cancelar</a>

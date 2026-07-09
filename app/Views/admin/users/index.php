@@ -5,11 +5,11 @@
             <a class="btn btn-dark" href="<?= url('/admin/users/create') ?>"><i class="bi bi-person-plus"></i> Novo Utilizador</a>
         </div>
         <table class="table align-middle">
-            <thead><tr><th>Nome</th><th>Email</th><th>Função</th><th>Departamento</th><th>Estado</th><th></th></tr></thead>
+            <thead><tr><th>Nome</th><th>Email</th><th>Função</th><th>Departamento</th><th>Admin</th><th>Estado</th><th></th></tr></thead>
             <tbody>
             <?php foreach (($users ?? []) as $u): ?>
                 <tr>
-                    <td><?= e($u['name']) ?></td><td><?= e($u['email']) ?></td><td><?= e($u['role']) ?></td><td><?= e($u['department']) ?></td><td><?= e($u['status']) ?></td>
+                    <td><?= e($u['name']) ?></td><td><?= e($u['email']) ?></td><td><?= e($u['role']) ?></td><td><?= e($u['department']) ?></td><td><?= !empty($u['is_admin']) ? '<span class="badge text-bg-dark">Sim</span>' : '<span class="text-muted">Não</span>' ?></td><td><?= e($u['status']) ?></td>
                     <td class="text-end">
                         <a class="btn btn-sm btn-outline-secondary" href="<?= e(url('/admin/users/edit?email=' . rawurlencode((string)$u['email']))) ?>" title="Editar <?= e($u['name']) ?>">
                             <i class="bi bi-pencil-square"></i>
