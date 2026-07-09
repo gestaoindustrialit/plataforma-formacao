@@ -26,8 +26,21 @@ class DashboardController extends Controller
         $pdo = $this->database->pdo();
         $pdo->exec('CREATE TABLE IF NOT EXISTS departments (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT, status TEXT DEFAULT "active", created_at TEXT, updated_at TEXT)');
         $pdo->exec('CREATE TABLE IF NOT EXISTS roles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT, is_admin INTEGER DEFAULT 0, created_at TEXT, updated_at TEXT)');
-        $pdo->exec('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT UNIQUE, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, department_id INTEGER NULL, role_id INTEGER NOT NULL, status TEXT DEFAULT "active", must_change_password INTEGER DEFAULT 0, last_login_at TEXT NULL, created_at TEXT, updated_at TEXT, FOREIGN KEY(department_id) REFERENCES departments(id), FOREIGN KEY(role_id) REFERENCES roles(id))');
+        $pdo->exec('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT UNIQUE, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, department_id INTEGER NULL, role_id INTEGER NOT NULL, is_admin INTEGER DEFAULT 0, status TEXT DEFAULT "active", must_change_password INTEGER DEFAULT 0, last_login_at TEXT NULL, created_at TEXT, updated_at TEXT, FOREIGN KEY(department_id) REFERENCES departments(id), FOREIGN KEY(role_id) REFERENCES roles(id))');
+        $this->ensureUsersAdminColumn();
         $pdo->exec('CREATE TABLE IF NOT EXISTS training_contents (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT DEFAULT "", type TEXT NOT NULL DEFAULT "Vídeo", department TEXT NOT NULL DEFAULT "", training_path TEXT NOT NULL DEFAULT "", visible_for TEXT NOT NULL DEFAULT "", editable_by TEXT NOT NULL DEFAULT "", video_url TEXT NOT NULL DEFAULT "", created_at TEXT, updated_at TEXT)');
+    }
+
+
+    private function ensureUsersAdminColumn(): void
+    {
+        foreach ($this->database->fetchAll('PRAGMA table_info(users)') as $field) {
+            if (strcasecmp((string)($field['name'] ?? ''), 'is_admin') === 0) {
+                return;
+            }
+        }
+
+        $this->database->pdo()->exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0');
     }
 
     private function defaultProfiles(): array
@@ -337,6 +350,7 @@ class DashboardController extends Controller
             'department' => trim((string)($user['department'] ?? '')),
             'status' => trim((string)($user['status'] ?? 'Ativo')),
             'password' => trim((string)($user['password'] ?? '')),
+            'is_admin' => !empty($user['is_admin']) ? 1 : 0,
         ];
     }
 
@@ -460,12 +474,13 @@ class DashboardController extends Controller
             'department' => (string)($row['department'] ?? ''),
             'status' => $this->statusFromDatabase((string)($row['status'] ?? 'active')),
             'password' => '',
+            'is_admin' => (int)($row['is_admin'] ?? 0),
         ];
     }
 
     private function userSelectSql(): string
     {
-        return 'SELECT u.id, u.name, u.email, u.status, r.name AS role, COALESCE(d.name, "") AS department FROM users u JOIN roles r ON r.id = u.role_id LEFT JOIN departments d ON d.id = u.department_id';
+        return 'SELECT u.id, u.name, u.email, u.status, COALESCE(u.is_admin, 0) AS is_admin, r.name AS role, COALESCE(d.name, "") AS department FROM users u JOIN roles r ON r.id = u.role_id LEFT JOIN departments d ON d.id = u.department_id';
     }
 
     private function findUserById(int $id): ?array
@@ -515,13 +530,14 @@ class DashboardController extends Controller
                 return false;
             }
 
-            $this->db()->query('INSERT INTO users (name, email, username, password, department_id, role_id, status, must_change_password, created_at, updated_at) VALUES (:name, :email, :username, :password, :department_id, :role_id, :status, 0, datetime("now"), datetime("now"))', [
+            $this->db()->query('INSERT INTO users (name, email, username, password, department_id, role_id, is_admin, status, must_change_password, created_at, updated_at) VALUES (:name, :email, :username, :password, :department_id, :role_id, :is_admin, :status, 0, datetime("now"), datetime("now"))', [
                 'name' => $item['name'],
                 'email' => $item['email'],
                 'username' => $this->uniqueUsername($this->usernameFromEmail($item['email'], time())),
                 'password' => $this->passwordForDatabase($item['password']),
                 'department_id' => $this->ensureDepartmentId($item['department']),
                 'role_id' => $this->ensureRoleId($item['role']),
+                'is_admin' => $item['is_admin'],
                 'status' => $this->statusToDatabase($item['status']),
             ]);
             return true;
@@ -547,6 +563,7 @@ class DashboardController extends Controller
                 'email' => $item['email'],
                 'department_id' => $this->ensureDepartmentId($item['department']),
                 'role_id' => $this->ensureRoleId($item['role']),
+                'is_admin' => $item['is_admin'],
                 'status' => $this->statusToDatabase($item['status']),
                 'updated_at' => date('Y-m-d H:i:s'),
                 'username' => $this->uniqueUsername($this->usernameFromEmail($item['email'], $id), $id),
@@ -580,7 +597,7 @@ class DashboardController extends Controller
         try {
             $pdo->beginTransaction();
             $pdo->exec('DELETE FROM users');
-            $stmt = $pdo->prepare('INSERT INTO users (id, name, email, username, password, department_id, role_id, status, must_change_password, created_at, updated_at) VALUES (:id, :name, :email, :username, :password, :department_id, :role_id, :status, 0, datetime("now"), datetime("now"))');
+            $stmt = $pdo->prepare('INSERT INTO users (id, name, email, username, password, department_id, role_id, is_admin, status, must_change_password, created_at, updated_at) VALUES (:id, :name, :email, :username, :password, :department_id, :role_id, :is_admin, :status, 0, datetime("now"), datetime("now"))');
 
             $normalized = [];
             foreach ($users as $user) {
@@ -601,6 +618,7 @@ class DashboardController extends Controller
                     'password' => $this->passwordForDatabase($item['password']),
                     'department_id' => $this->ensureDepartmentId($item['department']),
                     'role_id' => $this->ensureRoleId($item['role']),
+                    'is_admin' => $item['is_admin'],
                     'status' => $this->statusToDatabase($item['status']),
                 ]);
                 $normalized[] = $item;
@@ -700,6 +718,7 @@ class DashboardController extends Controller
             'department' => trim($_POST['department'] ?? ''),
             'status' => trim($_POST['status'] ?? 'Ativo'),
             'password' => trim($_POST['password'] ?? ''),
+            'is_admin' => isset($_POST['is_admin']) ? 1 : 0,
         ];
 
         if ($this->insertUserRecord($user)) {
@@ -737,6 +756,7 @@ class DashboardController extends Controller
             'role' => trim($_POST['role'] ?? ''),
             'department' => trim($_POST['department'] ?? ''),
             'status' => trim($_POST['status'] ?? 'Ativo'),
+            'is_admin' => isset($_POST['is_admin']) ? 1 : 0,
         ];
         $newPassword = trim($_POST['password'] ?? '');
 
